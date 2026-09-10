@@ -1,2106 +1,1388 @@
-[
-  {
-    "id": "qlib158_beta10",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "(\\\\mathrm{close}_t - \\\\mathrm{close}_{{t-10}}) / (10\\\\,\\\\mathrm{close})",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_beta20",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "(\\\\mathrm{close}_t - \\\\mathrm{close}_{{t-20}}) / (20\\\\,\\\\mathrm{close})",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_beta30",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "(\\\\mathrm{close}_t - \\\\mathrm{close}_{{t-30}}) / (30\\\\,\\\\mathrm{close})",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_beta5",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "(\\\\mathrm{close}_t - \\\\mathrm{close}_{{t-5}}) / (5\\\\,\\\\mathrm{close})",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_beta60",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "(\\\\mathrm{close}_t - \\\\mathrm{close}_{{t-60}}) / (60\\\\,\\\\mathrm{close})",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_cntd10",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\mathrm{CNTP}_10 - \\\\mathrm{CNTN}_10",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_cntd20",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\mathrm{CNTP}_20 - \\\\mathrm{CNTN}_20",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_cntd30",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\mathrm{CNTP}_30 - \\\\mathrm{CNTN}_30",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_cntd5",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\mathrm{CNTP}_5 - \\\\mathrm{CNTN}_5",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_cntd60",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\mathrm{CNTP}_60 - \\\\mathrm{CNTN}_60",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_cntn10",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\mathrm{rolling\\\\_mean}(\\\\mathrm{1}[\\\\mathrm{close}<\\\\mathrm{close}_{{-1}}], 10)",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_cntn20",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\mathrm{rolling\\\\_mean}(\\\\mathrm{1}[\\\\mathrm{close}<\\\\mathrm{close}_{{-1}}], 20)",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_cntn30",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\mathrm{rolling\\\\_mean}(\\\\mathrm{1}[\\\\mathrm{close}<\\\\mathrm{close}_{{-1}}], 30)",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_cntn5",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\mathrm{rolling\\\\_mean}(\\\\mathrm{1}[\\\\mathrm{close}<\\\\mathrm{close}_{{-1}}], 5)",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_cntn60",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\mathrm{rolling\\\\_mean}(\\\\mathrm{1}[\\\\mathrm{close}<\\\\mathrm{close}_{{-1}}], 60)",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_cntp10",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\mathrm{rolling\\\\_mean}(\\\\mathrm{1}[\\\\mathrm{close}>\\\\mathrm{close}_{{-1}}], 10)",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_cntp20",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\mathrm{rolling\\\\_mean}(\\\\mathrm{1}[\\\\mathrm{close}>\\\\mathrm{close}_{{-1}}], 20)",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_cntp30",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\mathrm{rolling\\\\_mean}(\\\\mathrm{1}[\\\\mathrm{close}>\\\\mathrm{close}_{{-1}}], 30)",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_cntp5",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\mathrm{rolling\\\\_mean}(\\\\mathrm{1}[\\\\mathrm{close}>\\\\mathrm{close}_{{-1}}], 5)",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_cntp60",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\mathrm{rolling\\\\_mean}(\\\\mathrm{1}[\\\\mathrm{close}>\\\\mathrm{close}_{{-1}}], 60)",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_cord10",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "microstructure"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_corr}(\\\\mathrm{close}/\\\\mathrm{close}_{{-1}}, \\\\log((\\\\mathrm{volume}+1)/(\\\\mathrm{volume}_{{-1}}+1)), 10)",
-    "columns_required": [
-      "close",
-      "volume"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_cord20",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "microstructure"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_corr}(\\\\mathrm{close}/\\\\mathrm{close}_{{-1}}, \\\\log((\\\\mathrm{volume}+1)/(\\\\mathrm{volume}_{{-1}}+1)), 20)",
-    "columns_required": [
-      "close",
-      "volume"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_cord30",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "microstructure"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_corr}(\\\\mathrm{close}/\\\\mathrm{close}_{{-1}}, \\\\log((\\\\mathrm{volume}+1)/(\\\\mathrm{volume}_{{-1}}+1)), 30)",
-    "columns_required": [
-      "close",
-      "volume"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_cord5",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "microstructure"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_corr}(\\\\mathrm{close}/\\\\mathrm{close}_{{-1}}, \\\\log((\\\\mathrm{volume}+1)/(\\\\mathrm{volume}_{{-1}}+1)), 5)",
-    "columns_required": [
-      "close",
-      "volume"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_cord60",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "microstructure"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_corr}(\\\\mathrm{close}/\\\\mathrm{close}_{{-1}}, \\\\log((\\\\mathrm{volume}+1)/(\\\\mathrm{volume}_{{-1}}+1)), 60)",
-    "columns_required": [
-      "close",
-      "volume"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_corr10",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "microstructure"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_corr}(\\\\mathrm{close}, \\\\log(\\\\mathrm{volume}+1), 10)",
-    "columns_required": [
-      "close",
-      "volume"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_corr20",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "microstructure"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_corr}(\\\\mathrm{close}, \\\\log(\\\\mathrm{volume}+1), 20)",
-    "columns_required": [
-      "close",
-      "volume"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_corr30",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "microstructure"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_corr}(\\\\mathrm{close}, \\\\log(\\\\mathrm{volume}+1), 30)",
-    "columns_required": [
-      "close",
-      "volume"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_corr5",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "microstructure"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_corr}(\\\\mathrm{close}, \\\\log(\\\\mathrm{volume}+1), 5)",
-    "columns_required": [
-      "close",
-      "volume"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_corr60",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "microstructure"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_corr}(\\\\mathrm{close}, \\\\log(\\\\mathrm{volume}+1), 60)",
-    "columns_required": [
-      "close",
-      "volume"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_imax10",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_argmax}(\\\\mathrm{high}, 10) / 10",
-    "columns_required": [
-      "high"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_imax20",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_argmax}(\\\\mathrm{high}, 20) / 20",
-    "columns_required": [
-      "high"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_imax30",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_argmax}(\\\\mathrm{high}, 30) / 30",
-    "columns_required": [
-      "high"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_imax5",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_argmax}(\\\\mathrm{high}, 5) / 5",
-    "columns_required": [
-      "high"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_imax60",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_argmax}(\\\\mathrm{high}, 60) / 60",
-    "columns_required": [
-      "high"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_imin10",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_argmin}(\\\\mathrm{low}, 10) / 10",
-    "columns_required": [
-      "low"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_imin20",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_argmin}(\\\\mathrm{low}, 20) / 20",
-    "columns_required": [
-      "low"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_imin30",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_argmin}(\\\\mathrm{low}, 30) / 30",
-    "columns_required": [
-      "low"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_imin5",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_argmin}(\\\\mathrm{low}, 5) / 5",
-    "columns_required": [
-      "low"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_imin60",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_argmin}(\\\\mathrm{low}, 60) / 60",
-    "columns_required": [
-      "low"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_imxd10",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "(\\\\mathrm{ts\\\\_argmax}(\\\\mathrm{high}, 10) - \\\\mathrm{ts\\\\_argmin}(\\\\mathrm{low}, 10)) / 10",
-    "columns_required": [
-      "high",
-      "low"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_imxd20",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "(\\\\mathrm{ts\\\\_argmax}(\\\\mathrm{high}, 20) - \\\\mathrm{ts\\\\_argmin}(\\\\mathrm{low}, 20)) / 20",
-    "columns_required": [
-      "high",
-      "low"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_imxd30",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "(\\\\mathrm{ts\\\\_argmax}(\\\\mathrm{high}, 30) - \\\\mathrm{ts\\\\_argmin}(\\\\mathrm{low}, 30)) / 30",
-    "columns_required": [
-      "high",
-      "low"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_imxd5",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "(\\\\mathrm{ts\\\\_argmax}(\\\\mathrm{high}, 5) - \\\\mathrm{ts\\\\_argmin}(\\\\mathrm{low}, 5)) / 5",
-    "columns_required": [
-      "high",
-      "low"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_imxd60",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "(\\\\mathrm{ts\\\\_argmax}(\\\\mathrm{high}, 60) - \\\\mathrm{ts\\\\_argmin}(\\\\mathrm{low}, 60)) / 60",
-    "columns_required": [
-      "high",
-      "low"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_klen",
-    "nickname": null,
-    "theme": [
-      "microstructure"
-    ],
-    "formula_latex": "(\\\\mathrm{high} - \\\\mathrm{low}) / \\\\mathrm{open}",
-    "columns_required": [
-      "open",
-      "high",
-      "low"
-    ],
-    "decay_horizon": 1,
-    "min_warmup_bars": 1
-  },
-  {
-    "id": "qlib158_klow",
-    "nickname": null,
-    "theme": [
-      "microstructure"
-    ],
-    "formula_latex": "(\\\\min(\\\\mathrm{open}, \\\\mathrm{close}) - \\\\mathrm{low}) / \\\\mathrm{open}",
-    "columns_required": [
-      "open",
-      "low",
-      "close"
-    ],
-    "decay_horizon": 1,
-    "min_warmup_bars": 1
-  },
-  {
-    "id": "qlib158_klow2",
-    "nickname": null,
-    "theme": [
-      "microstructure"
-    ],
-    "formula_latex": "(\\\\min(\\\\mathrm{open}, \\\\mathrm{close}) - \\\\mathrm{low}) / (\\\\mathrm{high} - \\\\mathrm{low})",
-    "columns_required": [
-      "open",
-      "high",
-      "low",
-      "close"
-    ],
-    "decay_horizon": 1,
-    "min_warmup_bars": 1
-  },
-  {
-    "id": "qlib158_kmid",
-    "nickname": null,
-    "theme": [
-      "microstructure"
-    ],
-    "formula_latex": "(\\\\mathrm{close} - \\\\mathrm{open}) / \\\\mathrm{open}",
-    "columns_required": [
-      "open",
-      "close"
-    ],
-    "decay_horizon": 1,
-    "min_warmup_bars": 1
-  },
-  {
-    "id": "qlib158_kmid2",
-    "nickname": null,
-    "theme": [
-      "microstructure"
-    ],
-    "formula_latex": "(\\\\mathrm{close} - \\\\mathrm{open}) / (\\\\mathrm{high} - \\\\mathrm{low})",
-    "columns_required": [
-      "open",
-      "high",
-      "low",
-      "close"
-    ],
-    "decay_horizon": 1,
-    "min_warmup_bars": 1
-  },
-  {
-    "id": "qlib158_ksft",
-    "nickname": null,
-    "theme": [
-      "microstructure"
-    ],
-    "formula_latex": "(2\\\\,\\\\mathrm{close} - \\\\mathrm{high} - \\\\mathrm{low}) / \\\\mathrm{open}",
-    "columns_required": [
-      "open",
-      "high",
-      "low",
-      "close"
-    ],
-    "decay_horizon": 1,
-    "min_warmup_bars": 1
-  },
-  {
-    "id": "qlib158_ksft2",
-    "nickname": null,
-    "theme": [
-      "microstructure"
-    ],
-    "formula_latex": "(2\\\\,\\\\mathrm{close} - \\\\mathrm{high} - \\\\mathrm{low}) / (\\\\mathrm{high} - \\\\mathrm{low})",
-    "columns_required": [
-      "open",
-      "high",
-      "low",
-      "close"
-    ],
-    "decay_horizon": 1,
-    "min_warmup_bars": 1
-  },
-  {
-    "id": "qlib158_kup",
-    "nickname": null,
-    "theme": [
-      "microstructure"
-    ],
-    "formula_latex": "(\\\\mathrm{high} - \\\\max(\\\\mathrm{open}, \\\\mathrm{close})) / \\\\mathrm{open}",
-    "columns_required": [
-      "open",
-      "high",
-      "close"
-    ],
-    "decay_horizon": 1,
-    "min_warmup_bars": 1
-  },
-  {
-    "id": "qlib158_kup2",
-    "nickname": null,
-    "theme": [
-      "microstructure"
-    ],
-    "formula_latex": "(\\\\mathrm{high} - \\\\max(\\\\mathrm{open}, \\\\mathrm{close})) / (\\\\mathrm{high} - \\\\mathrm{low})",
-    "columns_required": [
-      "open",
-      "high",
-      "low",
-      "close"
-    ],
-    "decay_horizon": 1,
-    "min_warmup_bars": 1
-  },
-  {
-    "id": "qlib158_ma10",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_mean}(\\\\mathrm{close}, 10) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_ma20",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_mean}(\\\\mathrm{close}, 20) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_ma30",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_mean}(\\\\mathrm{close}, 30) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_ma5",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_mean}(\\\\mathrm{close}, 5) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_ma60",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_mean}(\\\\mathrm{close}, 60) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_max10",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_max}(\\\\mathrm{high}, 10) / \\\\mathrm{close}",
-    "columns_required": [
-      "high",
-      "close"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_max20",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_max}(\\\\mathrm{high}, 20) / \\\\mathrm{close}",
-    "columns_required": [
-      "high",
-      "close"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_max30",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_max}(\\\\mathrm{high}, 30) / \\\\mathrm{close}",
-    "columns_required": [
-      "high",
-      "close"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_max5",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_max}(\\\\mathrm{high}, 5) / \\\\mathrm{close}",
-    "columns_required": [
-      "high",
-      "close"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_max60",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_max}(\\\\mathrm{high}, 60) / \\\\mathrm{close}",
-    "columns_required": [
-      "high",
-      "close"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_min10",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_min}(\\\\mathrm{low}, 10) / \\\\mathrm{close}",
-    "columns_required": [
-      "low",
-      "close"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_min20",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_min}(\\\\mathrm{low}, 20) / \\\\mathrm{close}",
-    "columns_required": [
-      "low",
-      "close"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_min30",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_min}(\\\\mathrm{low}, 30) / \\\\mathrm{close}",
-    "columns_required": [
-      "low",
-      "close"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_min5",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_min}(\\\\mathrm{low}, 5) / \\\\mathrm{close}",
-    "columns_required": [
-      "low",
-      "close"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_min60",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_min}(\\\\mathrm{low}, 60) / \\\\mathrm{close}",
-    "columns_required": [
-      "low",
-      "close"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_qtld10",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{quantile}_{{0.2}}(\\\\mathrm{close}, 10) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_qtld20",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{quantile}_{{0.2}}(\\\\mathrm{close}, 20) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_qtld30",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{quantile}_{{0.2}}(\\\\mathrm{close}, 30) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_qtld5",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{quantile}_{{0.2}}(\\\\mathrm{close}, 5) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_qtld60",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{quantile}_{{0.2}}(\\\\mathrm{close}, 60) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_qtlu10",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{quantile}_{{0.8}}(\\\\mathrm{close}, 10) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_qtlu20",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{quantile}_{{0.8}}(\\\\mathrm{close}, 20) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_qtlu30",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{quantile}_{{0.8}}(\\\\mathrm{close}, 30) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_qtlu5",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{quantile}_{{0.8}}(\\\\mathrm{close}, 5) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_qtlu60",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{quantile}_{{0.8}}(\\\\mathrm{close}, 60) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_rank10",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_rank}(\\\\mathrm{close}, 10)",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_rank20",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_rank}(\\\\mathrm{close}, 20)",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_rank30",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_rank}(\\\\mathrm{close}, 30)",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_rank5",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_rank}(\\\\mathrm{close}, 5)",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_rank60",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_rank}(\\\\mathrm{close}, 60)",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_resi10",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "(\\\\mathrm{close} - \\\\mathrm{ts\\\\_mean}(\\\\mathrm{close}, 10)) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_resi20",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "(\\\\mathrm{close} - \\\\mathrm{ts\\\\_mean}(\\\\mathrm{close}, 20)) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_resi30",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "(\\\\mathrm{close} - \\\\mathrm{ts\\\\_mean}(\\\\mathrm{close}, 30)) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_resi5",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "(\\\\mathrm{close} - \\\\mathrm{ts\\\\_mean}(\\\\mathrm{close}, 5)) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_resi60",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "(\\\\mathrm{close} - \\\\mathrm{ts\\\\_mean}(\\\\mathrm{close}, 60)) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_roc10",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{close}_t / \\\\mathrm{close}_{{t-10}} - 1",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_roc20",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{close}_t / \\\\mathrm{close}_{{t-20}} - 1",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_roc30",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{close}_t / \\\\mathrm{close}_{{t-30}} - 1",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_roc5",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{close}_t / \\\\mathrm{close}_{{t-5}} - 1",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_roc60",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{close}_t / \\\\mathrm{close}_{{t-60}} - 1",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_rsqr10",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_corr}(\\\\mathrm{close}, t, 10)^2",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_rsqr20",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_corr}(\\\\mathrm{close}, t, 20)^2",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_rsqr30",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_corr}(\\\\mathrm{close}, t, 30)^2",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_rsqr5",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_corr}(\\\\mathrm{close}, t, 5)^2",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_rsqr60",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_corr}(\\\\mathrm{close}, t, 60)^2",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_rsv10",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "(\\\\mathrm{close} - \\\\mathrm{ts\\\\_min}(\\\\mathrm{low}, 10)) / (\\\\mathrm{ts\\\\_max}(\\\\mathrm{high}, 10) - \\\\mathrm{ts\\\\_min}(\\\\mathrm{low}, 10))",
-    "columns_required": [
-      "high",
-      "low",
-      "close"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_rsv20",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "(\\\\mathrm{close} - \\\\mathrm{ts\\\\_min}(\\\\mathrm{low}, 20)) / (\\\\mathrm{ts\\\\_max}(\\\\mathrm{high}, 20) - \\\\mathrm{ts\\\\_min}(\\\\mathrm{low}, 20))",
-    "columns_required": [
-      "high",
-      "low",
-      "close"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_rsv30",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "(\\\\mathrm{close} - \\\\mathrm{ts\\\\_min}(\\\\mathrm{low}, 30)) / (\\\\mathrm{ts\\\\_max}(\\\\mathrm{high}, 30) - \\\\mathrm{ts\\\\_min}(\\\\mathrm{low}, 30))",
-    "columns_required": [
-      "high",
-      "low",
-      "close"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_rsv5",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "(\\\\mathrm{close} - \\\\mathrm{ts\\\\_min}(\\\\mathrm{low}, 5)) / (\\\\mathrm{ts\\\\_max}(\\\\mathrm{high}, 5) - \\\\mathrm{ts\\\\_min}(\\\\mathrm{low}, 5))",
-    "columns_required": [
-      "high",
-      "low",
-      "close"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_rsv60",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "(\\\\mathrm{close} - \\\\mathrm{ts\\\\_min}(\\\\mathrm{low}, 60)) / (\\\\mathrm{ts\\\\_max}(\\\\mathrm{high}, 60) - \\\\mathrm{ts\\\\_min}(\\\\mathrm{low}, 60))",
-    "columns_required": [
-      "high",
-      "low",
-      "close"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_std10",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_std}(\\\\mathrm{close}, 10) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_std20",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_std}(\\\\mathrm{close}, 20) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_std30",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_std}(\\\\mathrm{close}, 30) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_std5",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_std}(\\\\mathrm{close}, 5) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_std60",
-    "nickname": null,
-    "theme": [
-      "momentum"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_std}(\\\\mathrm{close}, 60) / \\\\mathrm{close}",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_sumd10",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\mathrm{SUMP}_w - \\\\mathrm{SUMN}_w",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_sumd20",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\mathrm{SUMP}_w - \\\\mathrm{SUMN}_w",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_sumd30",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\mathrm{SUMP}_w - \\\\mathrm{SUMN}_w",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_sumd5",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\mathrm{SUMP}_w - \\\\mathrm{SUMN}_w",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_sumd60",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\mathrm{SUMP}_w - \\\\mathrm{SUMN}_w",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_sumn10",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\sum \\\\max(-\\\\Delta\\\\mathrm{close}, 0) / \\\\sum |\\\\Delta\\\\mathrm{close}|",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_sumn20",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\sum \\\\max(-\\\\Delta\\\\mathrm{close}, 0) / \\\\sum |\\\\Delta\\\\mathrm{close}|",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_sumn30",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\sum \\\\max(-\\\\Delta\\\\mathrm{close}, 0) / \\\\sum |\\\\Delta\\\\mathrm{close}|",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_sumn5",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\sum \\\\max(-\\\\Delta\\\\mathrm{close}, 0) / \\\\sum |\\\\Delta\\\\mathrm{close}|",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_sumn60",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\sum \\\\max(-\\\\Delta\\\\mathrm{close}, 0) / \\\\sum |\\\\Delta\\\\mathrm{close}|",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_sump10",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\sum \\\\max(\\\\Delta\\\\mathrm{close}, 0) / \\\\sum |\\\\Delta\\\\mathrm{close}|",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_sump20",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\sum \\\\max(\\\\Delta\\\\mathrm{close}, 0) / \\\\sum |\\\\Delta\\\\mathrm{close}|",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_sump30",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\sum \\\\max(\\\\Delta\\\\mathrm{close}, 0) / \\\\sum |\\\\Delta\\\\mathrm{close}|",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_sump5",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\sum \\\\max(\\\\Delta\\\\mathrm{close}, 0) / \\\\sum |\\\\Delta\\\\mathrm{close}|",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_sump60",
-    "nickname": null,
-    "theme": [
-      "reversal"
-    ],
-    "formula_latex": "\\\\sum \\\\max(\\\\Delta\\\\mathrm{close}, 0) / \\\\sum |\\\\Delta\\\\mathrm{close}|",
-    "columns_required": [
-      "close"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_vma10",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_mean}(\\\\mathrm{volume}, 10) / \\\\mathrm{volume}",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_vma20",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_mean}(\\\\mathrm{volume}, 20) / \\\\mathrm{volume}",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_vma30",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_mean}(\\\\mathrm{volume}, 30) / \\\\mathrm{volume}",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_vma5",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_mean}(\\\\mathrm{volume}, 5) / \\\\mathrm{volume}",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_vma60",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_mean}(\\\\mathrm{volume}, 60) / \\\\mathrm{volume}",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_vstd10",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_std}(\\\\mathrm{volume}, 10) / \\\\mathrm{volume}",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_vstd20",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_std}(\\\\mathrm{volume}, 20) / \\\\mathrm{volume}",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_vstd30",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_std}(\\\\mathrm{volume}, 30) / \\\\mathrm{volume}",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_vstd5",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_std}(\\\\mathrm{volume}, 5) / \\\\mathrm{volume}",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_vstd60",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_std}(\\\\mathrm{volume}, 60) / \\\\mathrm{volume}",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_vsumd10",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\mathrm{VSUMP}_w - \\\\mathrm{VSUMN}_w",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_vsumd20",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\mathrm{VSUMP}_w - \\\\mathrm{VSUMN}_w",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_vsumd30",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\mathrm{VSUMP}_w - \\\\mathrm{VSUMN}_w",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_vsumd5",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\mathrm{VSUMP}_w - \\\\mathrm{VSUMN}_w",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_vsumd60",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\mathrm{VSUMP}_w - \\\\mathrm{VSUMN}_w",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_vsumn10",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\sum \\\\max(-\\\\Delta v, 0) / \\\\sum |\\\\Delta v|",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_vsumn20",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\sum \\\\max(-\\\\Delta v, 0) / \\\\sum |\\\\Delta v|",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_vsumn30",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\sum \\\\max(-\\\\Delta v, 0) / \\\\sum |\\\\Delta v|",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_vsumn5",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\sum \\\\max(-\\\\Delta v, 0) / \\\\sum |\\\\Delta v|",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_vsumn60",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\sum \\\\max(-\\\\Delta v, 0) / \\\\sum |\\\\Delta v|",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_vsump10",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\sum \\\\max(\\\\Delta v, 0) / \\\\sum |\\\\Delta v|",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_vsump20",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\sum \\\\max(\\\\Delta v, 0) / \\\\sum |\\\\Delta v|",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_vsump30",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\sum \\\\max(\\\\Delta v, 0) / \\\\sum |\\\\Delta v|",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_vsump5",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\sum \\\\max(\\\\Delta v, 0) / \\\\sum |\\\\Delta v|",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_vsump60",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\sum \\\\max(\\\\Delta v, 0) / \\\\sum |\\\\Delta v|",
-    "columns_required": [
-      "volume"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  },
-  {
-    "id": "qlib158_wvma10",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_std}(\\\\mathrm{ret}\\\\cdot v, 10) / \\\\mathrm{ts\\\\_mean}(|\\\\mathrm{ret}|\\\\cdot v, 10)",
-    "columns_required": [
-      "close",
-      "volume"
-    ],
-    "decay_horizon": 10,
-    "min_warmup_bars": 10
-  },
-  {
-    "id": "qlib158_wvma20",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_std}(\\\\mathrm{ret}\\\\cdot v, 20) / \\\\mathrm{ts\\\\_mean}(|\\\\mathrm{ret}|\\\\cdot v, 20)",
-    "columns_required": [
-      "close",
-      "volume"
-    ],
-    "decay_horizon": 20,
-    "min_warmup_bars": 20
-  },
-  {
-    "id": "qlib158_wvma30",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_std}(\\\\mathrm{ret}\\\\cdot v, 30) / \\\\mathrm{ts\\\\_mean}(|\\\\mathrm{ret}|\\\\cdot v, 30)",
-    "columns_required": [
-      "close",
-      "volume"
-    ],
-    "decay_horizon": 30,
-    "min_warmup_bars": 30
-  },
-  {
-    "id": "qlib158_wvma5",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_std}(\\\\mathrm{ret}\\\\cdot v, 5) / \\\\mathrm{ts\\\\_mean}(|\\\\mathrm{ret}|\\\\cdot v, 5)",
-    "columns_required": [
-      "close",
-      "volume"
-    ],
-    "decay_horizon": 5,
-    "min_warmup_bars": 5
-  },
-  {
-    "id": "qlib158_wvma60",
-    "nickname": null,
-    "theme": [
-      "volume",
-      "volatility"
-    ],
-    "formula_latex": "\\\\mathrm{ts\\\\_std}(\\\\mathrm{ret}\\\\cdot v, 60) / \\\\mathrm{ts\\\\_mean}(|\\\\mathrm{ret}|\\\\cdot v, 60)",
-    "columns_required": [
-      "close",
-      "volume"
-    ],
-    "decay_horizon": 60,
-    "min_warmup_bars": 60
-  }
+QLIB158_ALPHAS = [
+    {
+        "id": "qlib158_beta10",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "(\\mathrm{close}_t - \\mathrm{close}_{{t-10}}) / (10\\,\\mathrm{close})",
+        "columns_required": ["close"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_beta20",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "(\\mathrm{close}_t - \\mathrm{close}_{{t-20}}) / (20\\,\\mathrm{close})",
+        "columns_required": ["close"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_beta30",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "(\\mathrm{close}_t - \\mathrm{close}_{{t-30}}) / (30\\,\\mathrm{close})",
+        "columns_required": ["close"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_beta5",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "(\\mathrm{close}_t - \\mathrm{close}_{{t-5}}) / (5\\,\\mathrm{close})",
+        "columns_required": ["close"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_beta60",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "(\\mathrm{close}_t - \\mathrm{close}_{{t-60}}) / (60\\,\\mathrm{close})",
+        "columns_required": ["close"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_cntd10",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\mathrm{CNTP}_10 - \\mathrm{CNTN}_10",
+        "columns_required": ["close"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_cntd20",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\mathrm{CNTP}_20 - \\mathrm{CNTN}_20",
+        "columns_required": ["close"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_cntd30",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\mathrm{CNTP}_30 - \\mathrm{CNTN}_30",
+        "columns_required": ["close"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_cntd5",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\mathrm{CNTP}_5 - \\mathrm{CNTN}_5",
+        "columns_required": ["close"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_cntd60",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\mathrm{CNTP}_60 - \\mathrm{CNTN}_60",
+        "columns_required": ["close"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_cntn10",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\mathrm{rolling\\_mean}(\\mathrm{1}[\\mathrm{close}<\\mathrm{close}_{{-1}}], 10)",
+        "columns_required": ["close"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_cntn20",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\mathrm{rolling\\_mean}(\\mathrm{1}[\\mathrm{close}<\\mathrm{close}_{{-1}}], 20)",
+        "columns_required": ["close"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_cntn30",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\mathrm{rolling\\_mean}(\\mathrm{1}[\\mathrm{close}<\\mathrm{close}_{{-1}}], 30)",
+        "columns_required": ["close"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_cntn5",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\mathrm{rolling\\_mean}(\\mathrm{1}[\\mathrm{close}<\\mathrm{close}_{{-1}}], 5)",
+        "columns_required": ["close"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_cntn60",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\mathrm{rolling\\_mean}(\\mathrm{1}[\\mathrm{close}<\\mathrm{close}_{{-1}}], 60)",
+        "columns_required": ["close"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_cntp10",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\mathrm{rolling\\_mean}(\\mathrm{1}[\\mathrm{close}>\\mathrm{close}_{{-1}}], 10)",
+        "columns_required": ["close"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_cntp20",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\mathrm{rolling\\_mean}(\\mathrm{1}[\\mathrm{close}>\\mathrm{close}_{{-1}}], 20)",
+        "columns_required": ["close"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_cntp30",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\mathrm{rolling\\_mean}(\\mathrm{1}[\\mathrm{close}>\\mathrm{close}_{{-1}}], 30)",
+        "columns_required": ["close"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_cntp5",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\mathrm{rolling\\_mean}(\\mathrm{1}[\\mathrm{close}>\\mathrm{close}_{{-1}}], 5)",
+        "columns_required": ["close"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_cntp60",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\mathrm{rolling\\_mean}(\\mathrm{1}[\\mathrm{close}>\\mathrm{close}_{{-1}}], 60)",
+        "columns_required": ["close"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_cord10",
+        "nickname": None,
+        "theme": ["volume", "microstructure"],
+        "formula_latex": "\\mathrm{ts\\_corr}(\\mathrm{close}/\\mathrm{close}_{{-1}}, \\log((\\mathrm{volume}+1)/(\\mathrm{volume}_{{-1}}+1)), 10)",
+        "columns_required": ["close", "volume"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_cord20",
+        "nickname": None,
+        "theme": ["volume", "microstructure"],
+        "formula_latex": "\\mathrm{ts\\_corr}(\\mathrm{close}/\\mathrm{close}_{{-1}}, \\log((\\mathrm{volume}+1)/(\\mathrm{volume}_{{-1}}+1)), 20)",
+        "columns_required": ["close", "volume"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_cord30",
+        "nickname": None,
+        "theme": ["volume", "microstructure"],
+        "formula_latex": "\\mathrm{ts\\_corr}(\\mathrm{close}/\\mathrm{close}_{{-1}}, \\log((\\mathrm{volume}+1)/(\\mathrm{volume}_{{-1}}+1)), 30)",
+        "columns_required": ["close", "volume"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_cord5",
+        "nickname": None,
+        "theme": ["volume", "microstructure"],
+        "formula_latex": "\\mathrm{ts\\_corr}(\\mathrm{close}/\\mathrm{close}_{{-1}}, \\log((\\mathrm{volume}+1)/(\\mathrm{volume}_{{-1}}+1)), 5)",
+        "columns_required": ["close", "volume"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_cord60",
+        "nickname": None,
+        "theme": ["volume", "microstructure"],
+        "formula_latex": "\\mathrm{ts\\_corr}(\\mathrm{close}/\\mathrm{close}_{{-1}}, \\log((\\mathrm{volume}+1)/(\\mathrm{volume}_{{-1}}+1)), 60)",
+        "columns_required": ["close", "volume"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_corr10",
+        "nickname": None,
+        "theme": ["volume", "microstructure"],
+        "formula_latex": "\\mathrm{ts\\_corr}(\\mathrm{close}, \\log(\\mathrm{volume}+1), 10)",
+        "columns_required": ["close", "volume"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_corr20",
+        "nickname": None,
+        "theme": ["volume", "microstructure"],
+        "formula_latex": "\\mathrm{ts\\_corr}(\\mathrm{close}, \\log(\\mathrm{volume}+1), 20)",
+        "columns_required": ["close", "volume"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_corr30",
+        "nickname": None,
+        "theme": ["volume", "microstructure"],
+        "formula_latex": "\\mathrm{ts\\_corr}(\\mathrm{close}, \\log(\\mathrm{volume}+1), 30)",
+        "columns_required": ["close", "volume"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_corr5",
+        "nickname": None,
+        "theme": ["volume", "microstructure"],
+        "formula_latex": "\\mathrm{ts\\_corr}(\\mathrm{close}, \\log(\\mathrm{volume}+1), 5)",
+        "columns_required": ["close", "volume"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_corr60",
+        "nickname": None,
+        "theme": ["volume", "microstructure"],
+        "formula_latex": "\\mathrm{ts\\_corr}(\\mathrm{close}, \\log(\\mathrm{volume}+1), 60)",
+        "columns_required": ["close", "volume"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_imax10",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_argmax}(\\mathrm{high}, 10) / 10",
+        "columns_required": ["high"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_imax20",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_argmax}(\\mathrm{high}, 20) / 20",
+        "columns_required": ["high"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_imax30",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_argmax}(\\mathrm{high}, 30) / 30",
+        "columns_required": ["high"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_imax5",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_argmax}(\\mathrm{high}, 5) / 5",
+        "columns_required": ["high"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_imax60",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_argmax}(\\mathrm{high}, 60) / 60",
+        "columns_required": ["high"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_imin10",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_argmin}(\\mathrm{low}, 10) / 10",
+        "columns_required": ["low"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_imin20",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_argmin}(\\mathrm{low}, 20) / 20",
+        "columns_required": ["low"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_imin30",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_argmin}(\\mathrm{low}, 30) / 30",
+        "columns_required": ["low"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_imin5",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_argmin}(\\mathrm{low}, 5) / 5",
+        "columns_required": ["low"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_imin60",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_argmin}(\\mathrm{low}, 60) / 60",
+        "columns_required": ["low"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_imxd10",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "(\\mathrm{ts\\_argmax}(\\mathrm{high}, 10) - \\mathrm{ts\\_argmin}(\\mathrm{low}, 10)) / 10",
+        "columns_required": ["high", "low"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_imxd20",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "(\\mathrm{ts\\_argmax}(\\mathrm{high}, 20) - \\mathrm{ts\\_argmin}(\\mathrm{low}, 20)) / 20",
+        "columns_required": ["high", "low"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_imxd30",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "(\\mathrm{ts\\_argmax}(\\mathrm{high}, 30) - \\mathrm{ts\\_argmin}(\\mathrm{low}, 30)) / 30",
+        "columns_required": ["high", "low"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_imxd5",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "(\\mathrm{ts\\_argmax}(\\mathrm{high}, 5) - \\mathrm{ts\\_argmin}(\\mathrm{low}, 5)) / 5",
+        "columns_required": ["high", "low"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_imxd60",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "(\\mathrm{ts\\_argmax}(\\mathrm{high}, 60) - \\mathrm{ts\\_argmin}(\\mathrm{low}, 60)) / 60",
+        "columns_required": ["high", "low"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_klen",
+        "nickname": None,
+        "theme": ["microstructure"],
+        "formula_latex": "(\\mathrm{high} - \\mathrm{low}) / \\mathrm{open}",
+        "columns_required": ["open", "high", "low"],
+        "decay_horizon": 1,
+        "min_warmup_bars": 1,
+    },
+    {
+        "id": "qlib158_klow",
+        "nickname": None,
+        "theme": ["microstructure"],
+        "formula_latex": "(\\min(\\mathrm{open}, \\mathrm{close}) - \\mathrm{low}) / \\mathrm{open}",
+        "columns_required": ["open", "low", "close"],
+        "decay_horizon": 1,
+        "min_warmup_bars": 1,
+    },
+    {
+        "id": "qlib158_klow2",
+        "nickname": None,
+        "theme": ["microstructure"],
+        "formula_latex": "(\\min(\\mathrm{open}, \\mathrm{close}) - \\mathrm{low}) / (\\mathrm{high} - \\mathrm{low})",
+        "columns_required": ["open", "high", "low", "close"],
+        "decay_horizon": 1,
+        "min_warmup_bars": 1,
+    },
+    {
+        "id": "qlib158_kmid",
+        "nickname": None,
+        "theme": ["microstructure"],
+        "formula_latex": "(\\mathrm{close} - \\mathrm{open}) / \\mathrm{open}",
+        "columns_required": ["open", "close"],
+        "decay_horizon": 1,
+        "min_warmup_bars": 1,
+    },
+    {
+        "id": "qlib158_kmid2",
+        "nickname": None,
+        "theme": ["microstructure"],
+        "formula_latex": "(\\mathrm{close} - \\mathrm{open}) / (\\mathrm{high} - \\mathrm{low})",
+        "columns_required": ["open", "high", "low", "close"],
+        "decay_horizon": 1,
+        "min_warmup_bars": 1,
+    },
+    {
+        "id": "qlib158_ksft",
+        "nickname": None,
+        "theme": ["microstructure"],
+        "formula_latex": "(2\\,\\mathrm{close} - \\mathrm{high} - \\mathrm{low}) / \\mathrm{open}",
+        "columns_required": ["open", "high", "low", "close"],
+        "decay_horizon": 1,
+        "min_warmup_bars": 1,
+    },
+    {
+        "id": "qlib158_ksft2",
+        "nickname": None,
+        "theme": ["microstructure"],
+        "formula_latex": "(2\\,\\mathrm{close} - \\mathrm{high} - \\mathrm{low}) / (\\mathrm{high} - \\mathrm{low})",
+        "columns_required": ["open", "high", "low", "close"],
+        "decay_horizon": 1,
+        "min_warmup_bars": 1,
+    },
+    {
+        "id": "qlib158_kup",
+        "nickname": None,
+        "theme": ["microstructure"],
+        "formula_latex": "(\\mathrm{high} - \\max(\\mathrm{open}, \\mathrm{close})) / \\mathrm{open}",
+        "columns_required": ["open", "high", "close"],
+        "decay_horizon": 1,
+        "min_warmup_bars": 1,
+    },
+    {
+        "id": "qlib158_kup2",
+        "nickname": None,
+        "theme": ["microstructure"],
+        "formula_latex": "(\\mathrm{high} - \\max(\\mathrm{open}, \\mathrm{close})) / (\\mathrm{high} - \\mathrm{low})",
+        "columns_required": ["open", "high", "low", "close"],
+        "decay_horizon": 1,
+        "min_warmup_bars": 1,
+    },
+    {
+        "id": "qlib158_ma10",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_mean}(\\mathrm{close}, 10) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_ma20",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_mean}(\\mathrm{close}, 20) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_ma30",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_mean}(\\mathrm{close}, 30) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_ma5",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_mean}(\\mathrm{close}, 5) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_ma60",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_mean}(\\mathrm{close}, 60) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_max10",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_max}(\\mathrm{high}, 10) / \\mathrm{close}",
+        "columns_required": ["high", "close"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_max20",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_max}(\\mathrm{high}, 20) / \\mathrm{close}",
+        "columns_required": ["high", "close"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_max30",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_max}(\\mathrm{high}, 30) / \\mathrm{close}",
+        "columns_required": ["high", "close"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_max5",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_max}(\\mathrm{high}, 5) / \\mathrm{close}",
+        "columns_required": ["high", "close"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_max60",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_max}(\\mathrm{high}, 60) / \\mathrm{close}",
+        "columns_required": ["high", "close"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_min10",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_min}(\\mathrm{low}, 10) / \\mathrm{close}",
+        "columns_required": ["low", "close"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_min20",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_min}(\\mathrm{low}, 20) / \\mathrm{close}",
+        "columns_required": ["low", "close"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_min30",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_min}(\\mathrm{low}, 30) / \\mathrm{close}",
+        "columns_required": ["low", "close"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_min5",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_min}(\\mathrm{low}, 5) / \\mathrm{close}",
+        "columns_required": ["low", "close"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_min60",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_min}(\\mathrm{low}, 60) / \\mathrm{close}",
+        "columns_required": ["low", "close"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_qtld10",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{quantile}_{{0.2}}(\\mathrm{close}, 10) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_qtld20",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{quantile}_{{0.2}}(\\mathrm{close}, 20) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_qtld30",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{quantile}_{{0.2}}(\\mathrm{close}, 30) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_qtld5",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{quantile}_{{0.2}}(\\mathrm{close}, 5) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_qtld60",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{quantile}_{{0.2}}(\\mathrm{close}, 60) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_qtlu10",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{quantile}_{{0.8}}(\\mathrm{close}, 10) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_qtlu20",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{quantile}_{{0.8}}(\\mathrm{close}, 20) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_qtlu30",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{quantile}_{{0.8}}(\\mathrm{close}, 30) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_qtlu5",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{quantile}_{{0.8}}(\\mathrm{close}, 5) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_qtlu60",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{quantile}_{{0.8}}(\\mathrm{close}, 60) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_rank10",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_rank}(\\mathrm{close}, 10)",
+        "columns_required": ["close"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_rank20",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_rank}(\\mathrm{close}, 20)",
+        "columns_required": ["close"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_rank30",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_rank}(\\mathrm{close}, 30)",
+        "columns_required": ["close"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_rank5",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_rank}(\\mathrm{close}, 5)",
+        "columns_required": ["close"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_rank60",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_rank}(\\mathrm{close}, 60)",
+        "columns_required": ["close"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_resi10",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "(\\mathrm{close} - \\mathrm{ts\\_mean}(\\mathrm{close}, 10)) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_resi20",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "(\\mathrm{close} - \\mathrm{ts\\_mean}(\\mathrm{close}, 20)) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_resi30",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "(\\mathrm{close} - \\mathrm{ts\\_mean}(\\mathrm{close}, 30)) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_resi5",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "(\\mathrm{close} - \\mathrm{ts\\_mean}(\\mathrm{close}, 5)) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_resi60",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "(\\mathrm{close} - \\mathrm{ts\\_mean}(\\mathrm{close}, 60)) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_roc10",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{close}_t / \\mathrm{close}_{{t-10}} - 1",
+        "columns_required": ["close"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_roc20",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{close}_t / \\mathrm{close}_{{t-20}} - 1",
+        "columns_required": ["close"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_roc30",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{close}_t / \\mathrm{close}_{{t-30}} - 1",
+        "columns_required": ["close"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_roc5",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{close}_t / \\mathrm{close}_{{t-5}} - 1",
+        "columns_required": ["close"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_roc60",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{close}_t / \\mathrm{close}_{{t-60}} - 1",
+        "columns_required": ["close"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_rsqr10",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_corr}(\\mathrm{close}, t, 10)^2",
+        "columns_required": ["close"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_rsqr20",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_corr}(\\mathrm{close}, t, 20)^2",
+        "columns_required": ["close"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_rsqr30",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_corr}(\\mathrm{close}, t, 30)^2",
+        "columns_required": ["close"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_rsqr5",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_corr}(\\mathrm{close}, t, 5)^2",
+        "columns_required": ["close"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_rsqr60",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_corr}(\\mathrm{close}, t, 60)^2",
+        "columns_required": ["close"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_rsv10",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "(\\mathrm{close} - \\mathrm{ts\\_min}(\\mathrm{low}, 10)) / (\\mathrm{ts\\_max}(\\mathrm{high}, 10) - \\mathrm{ts\\_min}(\\mathrm{low}, 10))",
+        "columns_required": ["high", "low", "close"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_rsv20",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "(\\mathrm{close} - \\mathrm{ts\\_min}(\\mathrm{low}, 20)) / (\\mathrm{ts\\_max}(\\mathrm{high}, 20) - \\mathrm{ts\\_min}(\\mathrm{low}, 20))",
+        "columns_required": ["high", "low", "close"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_rsv30",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "(\\mathrm{close} - \\mathrm{ts\\_min}(\\mathrm{low}, 30)) / (\\mathrm{ts\\_max}(\\mathrm{high}, 30) - \\mathrm{ts\\_min}(\\mathrm{low}, 30))",
+        "columns_required": ["high", "low", "close"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_rsv5",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "(\\mathrm{close} - \\mathrm{ts\\_min}(\\mathrm{low}, 5)) / (\\mathrm{ts\\_max}(\\mathrm{high}, 5) - \\mathrm{ts\\_min}(\\mathrm{low}, 5))",
+        "columns_required": ["high", "low", "close"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_rsv60",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "(\\mathrm{close} - \\mathrm{ts\\_min}(\\mathrm{low}, 60)) / (\\mathrm{ts\\_max}(\\mathrm{high}, 60) - \\mathrm{ts\\_min}(\\mathrm{low}, 60))",
+        "columns_required": ["high", "low", "close"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_std10",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_std}(\\mathrm{close}, 10) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_std20",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_std}(\\mathrm{close}, 20) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_std30",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_std}(\\mathrm{close}, 30) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_std5",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_std}(\\mathrm{close}, 5) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_std60",
+        "nickname": None,
+        "theme": ["momentum"],
+        "formula_latex": "\\mathrm{ts\\_std}(\\mathrm{close}, 60) / \\mathrm{close}",
+        "columns_required": ["close"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_sumd10",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\mathrm{SUMP}_w - \\mathrm{SUMN}_w",
+        "columns_required": ["close"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_sumd20",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\mathrm{SUMP}_w - \\mathrm{SUMN}_w",
+        "columns_required": ["close"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_sumd30",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\mathrm{SUMP}_w - \\mathrm{SUMN}_w",
+        "columns_required": ["close"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_sumd5",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\mathrm{SUMP}_w - \\mathrm{SUMN}_w",
+        "columns_required": ["close"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_sumd60",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\mathrm{SUMP}_w - \\mathrm{SUMN}_w",
+        "columns_required": ["close"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_sumn10",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\sum \\max(-\\Delta\\mathrm{close}, 0) / \\sum |\\Delta\\mathrm{close}|",
+        "columns_required": ["close"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_sumn20",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\sum \\max(-\\Delta\\mathrm{close}, 0) / \\sum |\\Delta\\mathrm{close}|",
+        "columns_required": ["close"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_sumn30",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\sum \\max(-\\Delta\\mathrm{close}, 0) / \\sum |\\Delta\\mathrm{close}|",
+        "columns_required": ["close"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_sumn5",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\sum \\max(-\\Delta\\mathrm{close}, 0) / \\sum |\\Delta\\mathrm{close}|",
+        "columns_required": ["close"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_sumn60",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\sum \\max(-\\Delta\\mathrm{close}, 0) / \\sum |\\Delta\\mathrm{close}|",
+        "columns_required": ["close"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_sump10",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\sum \\max(\\Delta\\mathrm{close}, 0) / \\sum |\\Delta\\mathrm{close}|",
+        "columns_required": ["close"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_sump20",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\sum \\max(\\Delta\\mathrm{close}, 0) / \\sum |\\Delta\\mathrm{close}|",
+        "columns_required": ["close"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_sump30",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\sum \\max(\\Delta\\mathrm{close}, 0) / \\sum |\\Delta\\mathrm{close}|",
+        "columns_required": ["close"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_sump5",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\sum \\max(\\Delta\\mathrm{close}, 0) / \\sum |\\Delta\\mathrm{close}|",
+        "columns_required": ["close"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_sump60",
+        "nickname": None,
+        "theme": ["reversal"],
+        "formula_latex": "\\sum \\max(\\Delta\\mathrm{close}, 0) / \\sum |\\Delta\\mathrm{close}|",
+        "columns_required": ["close"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_vma10",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\mathrm{ts\\_mean}(\\mathrm{volume}, 10) / \\mathrm{volume}",
+        "columns_required": ["volume"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_vma20",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\mathrm{ts\\_mean}(\\mathrm{volume}, 20) / \\mathrm{volume}",
+        "columns_required": ["volume"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_vma30",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\mathrm{ts\\_mean}(\\mathrm{volume}, 30) / \\mathrm{volume}",
+        "columns_required": ["volume"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_vma5",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\mathrm{ts\\_mean}(\\mathrm{volume}, 5) / \\mathrm{volume}",
+        "columns_required": ["volume"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_vma60",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\mathrm{ts\\_mean}(\\mathrm{volume}, 60) / \\mathrm{volume}",
+        "columns_required": ["volume"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_vstd10",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\mathrm{ts\\_std}(\\mathrm{volume}, 10) / \\mathrm{volume}",
+        "columns_required": ["volume"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_vstd20",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\mathrm{ts\\_std}(\\mathrm{volume}, 20) / \\mathrm{volume}",
+        "columns_required": ["volume"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_vstd30",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\mathrm{ts\\_std}(\\mathrm{volume}, 30) / \\mathrm{volume}",
+        "columns_required": ["volume"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_vstd5",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\mathrm{ts\\_std}(\\mathrm{volume}, 5) / \\mathrm{volume}",
+        "columns_required": ["volume"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_vstd60",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\mathrm{ts\\_std}(\\mathrm{volume}, 60) / \\mathrm{volume}",
+        "columns_required": ["volume"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_vsumd10",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\mathrm{VSUMP}_w - \\mathrm{VSUMN}_w",
+        "columns_required": ["volume"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_vsumd20",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\mathrm{VSUMP}_w - \\mathrm{VSUMN}_w",
+        "columns_required": ["volume"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_vsumd30",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\mathrm{VSUMP}_w - \\mathrm{VSUMN}_w",
+        "columns_required": ["volume"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_vsumd5",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\mathrm{VSUMP}_w - \\mathrm{VSUMN}_w",
+        "columns_required": ["volume"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_vsumd60",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\mathrm{VSUMP}_w - \\mathrm{VSUMN}_w",
+        "columns_required": ["volume"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_vsumn10",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\sum \\max(-\\Delta v, 0) / \\sum |\\Delta v|",
+        "columns_required": ["volume"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_vsumn20",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\sum \\max(-\\Delta v, 0) / \\sum |\\Delta v|",
+        "columns_required": ["volume"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_vsumn30",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\sum \\max(-\\Delta v, 0) / \\sum |\\Delta v|",
+        "columns_required": ["volume"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_vsumn5",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\sum \\max(-\\Delta v, 0) / \\sum |\\Delta v|",
+        "columns_required": ["volume"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_vsumn60",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\sum \\max(-\\Delta v, 0) / \\sum |\\Delta v|",
+        "columns_required": ["volume"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_vsump10",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\sum \\max(\\Delta v, 0) / \\sum |\\Delta v|",
+        "columns_required": ["volume"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_vsump20",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\sum \\max(\\Delta v, 0) / \\sum |\\Delta v|",
+        "columns_required": ["volume"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_vsump30",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\sum \\max(\\Delta v, 0) / \\sum |\\Delta v|",
+        "columns_required": ["volume"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_vsump5",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\sum \\max(\\Delta v, 0) / \\sum |\\Delta v|",
+        "columns_required": ["volume"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_vsump60",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\sum \\max(\\Delta v, 0) / \\sum |\\Delta v|",
+        "columns_required": ["volume"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
+    {
+        "id": "qlib158_wvma10",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\mathrm{ts\\_std}(\\mathrm{ret}\\cdot v, 10) / \\mathrm{ts\\_mean}(|\\mathrm{ret}|\\cdot v, 10)",
+        "columns_required": ["close", "volume"],
+        "decay_horizon": 10,
+        "min_warmup_bars": 10,
+    },
+    {
+        "id": "qlib158_wvma20",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\mathrm{ts\\_std}(\\mathrm{ret}\\cdot v, 20) / \\mathrm{ts\\_mean}(|\\mathrm{ret}|\\cdot v, 20)",
+        "columns_required": ["close", "volume"],
+        "decay_horizon": 20,
+        "min_warmup_bars": 20,
+    },
+    {
+        "id": "qlib158_wvma30",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\mathrm{ts\\_std}(\\mathrm{ret}\\cdot v, 30) / \\mathrm{ts\\_mean}(|\\mathrm{ret}|\\cdot v, 30)",
+        "columns_required": ["close", "volume"],
+        "decay_horizon": 30,
+        "min_warmup_bars": 30,
+    },
+    {
+        "id": "qlib158_wvma5",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\mathrm{ts\\_std}(\\mathrm{ret}\\cdot v, 5) / \\mathrm{ts\\_mean}(|\\mathrm{ret}|\\cdot v, 5)",
+        "columns_required": ["close", "volume"],
+        "decay_horizon": 5,
+        "min_warmup_bars": 5,
+    },
+    {
+        "id": "qlib158_wvma60",
+        "nickname": None,
+        "theme": ["volume", "volatility"],
+        "formula_latex": "\\mathrm{ts\\_std}(\\mathrm{ret}\\cdot v, 60) / \\mathrm{ts\\_mean}(|\\mathrm{ret}|\\cdot v, 60)",
+        "columns_required": ["close", "volume"],
+        "decay_horizon": 60,
+        "min_warmup_bars": 60,
+    },
 ]
