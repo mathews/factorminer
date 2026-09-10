@@ -31,6 +31,10 @@ dependencies = [
     "pyyaml>=6.0",
     "click>=8.0",
     "tqdm>=4.65",
+    "networkx",
+    "sympy",
+    "fastparquet",
+    "xgboost",
 ]
 
 [project.optional-dependencies]
@@ -140,3 +144,29 @@ addopts = "-v --tb=short"
 python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
+
+# =========================
+# Basedpyright 额外规则（可选）
+# =========================
+# basedpyright 在 pyright 基础上增加了一些更严格的规则，
+# 可以在这里单独控制（不同版本规则名可能略有差异，以实际为准）。
+[tool.basedpyright]
+# 示例：启用一些推荐的额外检查
+# 注意：basedpyright 的配置键和规则名可能随版本变化，
+# 这里给出常见模式，实际以文档/报错提示为准。
+typeCheckingMode = "standard"  # 通常与 pyright 保持一致
+
+# 若 basedpyright 支持类似 pyright 的规则开关，可这样写：
+# reportUnannotatedClassAttribute = "warning"
+# reportIncompatibleUnannotatedOverride = "warning"
+
+allowedUntypedLibraries = ["joblib"]
+reportUnusedCallResult = false
+reportDeprecated = false
+reportAny = false
+reportMissingTypeStubs = false
+reportUnusedParameter = false
+reportUnsafeMultipleInheritance = false
+reportUnusedFunction = false
+reportUnknownMemberType = false
+reportUnusedExpression = false

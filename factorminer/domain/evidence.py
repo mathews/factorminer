@@ -23,12 +23,7 @@ class FrozenPayload:
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any] | None) -> FrozenPayload:
         return cls(
-            tuple(
-                sorted(
-                    (str(key), freeze_value(item))
-                    for key, item in (value or {}).items()
-                )
-            )
+            tuple(sorted((str(key), freeze_value(item)) for key, item in (value or {}).items()))
         )
 
     def to_dict(self) -> dict[str, Any]:

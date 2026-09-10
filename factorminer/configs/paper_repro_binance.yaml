@@ -27,8 +27,8 @@ data:
   market: "crypto"
   universe: "Binance"
   frequency: "10min"
-  train_period: ["2024-01-01", "2024-12-31"]
-  test_period: ["2025-01-01", "2025-12-31"]
+  train_period: ["2026-02-14", "2026-02-16"]
+  test_period: ["2026-02-17", "2026-02-18"]
   targets:
     - name: "paper"
       entry_delay_bars: 1

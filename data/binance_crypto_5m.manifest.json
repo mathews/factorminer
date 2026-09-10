@@ -48,8 +48,8 @@
   "paper_context": {
     "paper_binance_frequency": "10min",
     "paper_binance_asset_count": 64,
-    "paper_train_period": "2024-01-01 through 2024-12-31",
-    "paper_test_period": "2025-01-01 through 2025-12-31",
+    "paper_train_period": "2026-02-14 through 2026-02-16",
+    "paper_test_period": "2026-02-17 through 2026-02-18",
     "note": "The bundled sample is smaller, uses 5-minute bars, and covers a short 2026 window."
   },
   "matching_config": "factorminer/configs/binance_sample.yaml",

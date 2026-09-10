@@ -182,7 +182,16 @@ class ValidationPipeline:
             self.returns,
             self.target_panels,
         )
-        paper_stats = result.target_stats["paper"]
+
+        # logger.info(f"target_stats ~~ {result.target_stats}")
+        #
+
+        paper_stats = {}
+        if result.target_stats.get("paper") is not None:
+            paper_stats = result.target_stats["paper"]
+        elif result.target_stats.get("research") is not None:
+            paper_stats = result.target_stats["research"]
+
         result.ic_mean = paper_stats["ic_mean"]
         result.ic_paper_mean = paper_stats["ic_paper_mean"]
         result.ic_abs_mean = paper_stats["ic_abs_mean"]

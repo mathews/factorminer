@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _create_llm_provider(cfg, mock: bool):
     """Create an LLM provider from config or use mock."""
     from factorminer.agent.llm_interface import MissingAPIKeyError, MockProvider, create_provider
@@ -59,9 +60,7 @@ def _create_llm_provider(cfg, mock: bool):
 
     # Cascade: prefer nested raw llm.cascade block; fall back to flat fields.
     cascade_raw = raw_llm.get("cascade") if isinstance(raw_llm.get("cascade"), dict) else {}
-    cascade_enabled = bool(
-        cascade_raw.get("enabled", getattr(llm_cfg, "cascade_enabled", False))
-    )
+    cascade_enabled = bool(cascade_raw.get("enabled", getattr(llm_cfg, "cascade_enabled", False)))
     if cascade_enabled:
         llm_config["cascade"] = {
             "enabled": True,
@@ -122,11 +121,7 @@ def _filter_dataclass_kwargs(source, target_cls):
     """Copy shared dataclass fields from one config object to another."""
     target_fields = {f.name for f in fields(target_cls)}
     source_fields = getattr(source, "__dataclass_fields__", {})
-    return {
-        name: getattr(source, name)
-        for name in source_fields
-        if name in target_fields
-    }
+    return {name: getattr(source, name) for name in source_fields if name in target_fields}
 
 
 def _build_debate_config(cfg):
@@ -432,7 +427,9 @@ def _doctor_checks(cfg, raw: dict, output_dir: Path) -> list[dict]:
 
             cuda_ok = bool(torch.cuda.is_available())
             status = "ok" if cuda_ok else "error"
-            detail = "CUDA is available" if cuda_ok else "GPU backend requested but CUDA is unavailable"
+            detail = (
+                "CUDA is available" if cuda_ok else "GPU backend requested but CUDA is unavailable"
+            )
             checks.append(_check(status, "cuda", detail))
         except Exception as exc:
             checks.append(_check("error", "cuda", f"GPU backend requested but torch failed: {exc}"))
@@ -445,7 +442,13 @@ def _doctor_checks(cfg, raw: dict, output_dir: Path) -> list[dict]:
         "faiss-cpu": "faiss",
     }
     for package, module in optional_modules.items():
-        if find_spec(module) is None:
+        m_spec = None
+        try:
+            m_spec = find_spec(module)
+        except:
+            pass
+
+        if m_spec is None:
             checks.append(_check("warning", f"optional:{package}", "Not installed"))
         else:
             checks.append(_check("ok", f"optional:{package}", "Installed"))
@@ -468,14 +471,22 @@ def _doctor_checks(cfg, raw: dict, output_dir: Path) -> list[dict]:
     if data_path:
         path = Path(data_path).expanduser()
         status = "ok" if path.exists() else "error"
-        detail = f"Configured data path exists: {path}" if path.exists() else f"Configured data path is missing: {path}"
+        detail = (
+            f"Configured data path exists: {path}"
+            if path.exists()
+            else f"Configured data path is missing: {path}"
+        )
         checks.append(_check(status, "data_path", detail))
     else:
-        checks.append(_check("warning", "data_path", "No data_path configured; use --mock or --data"))
+        checks.append(
+            _check("warning", "data_path", "No data_path configured; use --mock or --data")
+        )
 
     try:
         output_dir.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile(prefix=".factorminer-doctor-", dir=output_dir, delete=True):
+        with tempfile.NamedTemporaryFile(
+            prefix=".factorminer-doctor-", dir=output_dir, delete=True
+        ):
             pass
         checks.append(_check("ok", "output_dir", f"Writable: {output_dir}"))
     except Exception as exc:
@@ -495,29 +506,32 @@ def _print_doctor_report(checks: list[dict]) -> None:
 def _starter_config() -> dict:
     """Return a CPU-safe, mock-friendly starter config."""
     config = load_default_yaml()
-    config = _deep_merge_dict(config, {
-        "output_dir": "./output",
-        "data_path": None,
-        "mining": {
-            "target_library_size": 5,
-            "batch_size": 8,
-            "max_iterations": 3,
-            "ic_threshold": 0.0001,
-            "icir_threshold": 0.0001,
-            "correlation_threshold": 1.0,
-            "replacement_ic_min": 0.001,
-            "replacement_ic_ratio": 1.0,
+    config = _deep_merge_dict(
+        config,
+        {
+            "output_dir": "./output",
+            "data_path": None,
+            "mining": {
+                "target_library_size": 5,
+                "batch_size": 8,
+                "max_iterations": 3,
+                "ic_threshold": 0.0001,
+                "icir_threshold": 0.0001,
+                "correlation_threshold": 1.0,
+                "replacement_ic_min": 0.001,
+                "replacement_ic_ratio": 1.0,
+            },
+            "evaluation": {
+                "backend": "numpy",
+                "signal_failure_policy": "synthetic",
+            },
+            "llm": {
+                "provider": "mock",
+                "model": "mock",
+                "batch_candidates": 8,
+            },
         },
-        "evaluation": {
-            "backend": "numpy",
-            "signal_failure_policy": "synthetic",
-        },
-        "llm": {
-            "provider": "mock",
-            "model": "mock",
-            "batch_candidates": 8,
-        },
-    })
+    )
     return config
 
 
@@ -664,7 +678,6 @@ def _run_session_sensitivity(output_dir: Path, factor_ref: str) -> dict:
         factor_name=str(target.get("name", factor_ref)),
     )
     return result.to_dict()
-
 
 
 def _inspect_session_dir(output_dir: Path) -> dict:

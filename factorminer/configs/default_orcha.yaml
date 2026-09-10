@@ -1,0 +1,380 @@
+# =============================================================================
+# FactorMiner Default Configuration
+# =============================================================================
+# This file provides sensible defaults for the FactorMiner mining pipeline.
+# Override any setting by providing a user config file via --config flag,
+# or by passing CLI options directly.
+#
+# Resolution order: defaults -> user config -> CLI overrides
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Data paths
+# ---------------------------------------------------------------------------
+# Path to market data CSV/Parquet/HDF5 file. Set to null to use mock data.
+data_path: /data/fuyao_data/hithink-finance/1000_panel_f.parquet
+
+# Directory for all output artifacts (libraries, plots, logs).
+output_dir: "/data/fuyao_data/factorminer/output"
+
+# ---------------------------------------------------------------------------
+# Mining parameters (Ralph Loop)
+# ---------------------------------------------------------------------------
+mining:
+  # Target number of factors in the final library (paper: 110)
+  target_library_size: 110
+
+  # Number of candidate factors to generate per iteration (paper: 40)
+  batch_size: 40
+
+  # Maximum number of Ralph Loop iterations before stopping
+  max_iterations: 200
+
+  # Minimum absolute IC for a factor to pass Stage 1 screening (paper: 0.04)
+  ic_threshold: 0.04
+
+  # Minimum ICIR for factor quality filtering
+  icir_threshold: 0.5
+
+  # Maximum pairwise |rho| allowed between library factors (paper: 0.5)
+  correlation_threshold: 0.5
+
+  # Minimum IC required for a candidate to replace an existing factor
+  replacement_ic_min: 0.10
+
+  # Replacement IC ratio: candidate IC must be >= ratio * existing IC
+  replacement_ic_ratio: 1.3
+
+# ---------------------------------------------------------------------------
+# Evaluation backend
+# ---------------------------------------------------------------------------
+evaluation:
+  # Number of parallel workers for factor evaluation
+  num_workers: 40
+
+  # Number of assets used in fast IC screening (Stage 1)
+  fast_screen_assets: 100
+
+  # GPU device identifier (used when backend is "gpu")
+  gpu_device: "cuda:0"
+
+  # Computation backend: "numpy" (portable CPU), "gpu" (CUDA),
+  # or "c" (compiled CPU kernels via Bottleneck)
+  backend: "numpy"
+
+  # Redundancy/dependence metric used for admission, replacement,
+  # and library geometry diagnostics.
+  redundancy_metric: "spearman"
+
+  # How to handle factor expression failures during evaluation/mining:
+  # "reject" = fail the factor/command, "synthetic" = deterministic fallback,
+  # "raise" = propagate the raw exception.
+  signal_failure_policy: "reject"
+
+# ---------------------------------------------------------------------------
+# Data loading
+# ---------------------------------------------------------------------------
+data:
+  # Market type: "a_shares", "crypto", etc.
+  market: "a_shares"
+
+  # Asset universe filter: "CSI500", "CSI1000", "HS300", "Binance"
+  universe: "CSI1000"
+
+  # Bar frequency: "10min", "30min", "1h", "1d"
+  frequency: "1d"
+
+  # Feature columns available for factor construction
+  features:
+    - "$open"
+    - "$high"
+    - "$low"
+    - "$close"
+    - "$volume"
+    - "$amt"
+    - "$vwap"
+    - "$returns"
+
+  # Training period [start, end] in ISO format
+  train_period: ["2016-09-06", "2024-09-06"]
+
+  # Out-of-sample test period [start, end] in ISO format
+  test_period: ["2024-09-07", "2026-09-08"]
+
+  # Named target definitions. The default target drives benchmark-facing metrics;
+  # research mode can score all configured targets jointly.
+  targets:
+    - name: "research"
+      entry_delay_bars: 1
+      holding_bars: 1
+      price_pair: "open_to_close"
+      return_transform: "simple"
+
+  # Target used for paper-style scalar evaluation surfaces.
+  default_target: "research"
+
+# ---------------------------------------------------------------------------
+# LLM provider settings
+# ---------------------------------------------------------------------------
+llm:
+  # Provider name: "openai", "anthropic", "google", "openai_compatible",
+  # "local", or "mock"
+  provider: "google"
+
+  # Model identifier (provider-specific)
+  # OpenAI:    "gpt-4o", "gpt-4", etc.
+  # Anthropic: "claude-sonnet-4-6", "claude-opus-4-6", etc.
+  # Google:    "gemini-2.0-flash", etc.
+  # Local:     Ollama/vLLM/SGLang model name
+  model: "gemini-2.0-flash"
+
+  # API key for the chosen provider.
+  # Can also be set via environment variables:
+  #   OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY
+  # NEVER set a frontier API key when provider is openai_compatible/local —
+  # local engines use cascade.draft_api_key / local_api_key instead.
+  api_key: null
+
+  # Sampling temperature for factor generation (higher = more creative)
+  temperature: 0.8
+
+  # Maximum tokens in LLM response
+  max_tokens: 4096
+
+  # Number of candidate factors requested per LLM call
+  batch_candidates: 40
+
+  # Prompt caching (default ON). Anthropic: cache_control ephemeral breakpoint
+  # on the stable system prefix. OpenAI: prompt_cache_key from that prefix.
+  # Harmless no-op under --mock / Google.
+  prompt_cache: true
+
+  # Request timeout seconds for frontier HTTP clients.
+  timeout_s: 120.0
+
+  # Optional OpenAI-compatible base_url (local YAML only — SSRF-sensitive;
+  # never accept from remote/untrusted input). Prefer cascade.draft_base_url
+  # for local draft engines so frontier keys are not forwarded.
+  base_url: null
+
+  # Cheap-first cascade: local draft -> deterministic DSL parse signal ->
+  # frontier escalate only on parse failure. Default OFF.
+  # Viable because FactorMiner has a deterministic expression parser — a free
+  # routing signal most generic agentic-cost papers do not have.
+  cascade_enabled: false
+  cascade_draft_provider: "openai_compatible"
+  cascade_draft_model: "llama3.2"
+  # SECURITY (SSRF): draft_base_url from local config only.
+  cascade_draft_base_url: "http://127.0.0.1:11434/v1"
+  cascade_timeout_s: 60.0
+  cascade_escalate_on_parse_failure: true
+
+  # Nested cascade block (optional alternative to the flat cascade_* keys).
+  # cascade:
+  #   enabled: false
+  #   draft_provider: openai_compatible
+  #   draft_model: llama3.2
+  #   draft_base_url: "http://127.0.0.1:11434/v1"
+  #   draft_api_key: local
+  #   timeout_s: 60.0
+  #   escalate_on_parse_failure: true
+
+# ---------------------------------------------------------------------------
+# Experience memory system
+# ---------------------------------------------------------------------------
+memory:
+  # Retrieval/distillation policy: "paper", "none", "kg",
+  # "family_aware", or "regime_aware"
+  policy: "paper"
+
+  # Maximum number of success patterns to retain in memory
+  max_success_patterns: 50
+
+  # Maximum number of failure patterns to retain in memory
+  max_failure_patterns: 100
+
+  # Maximum number of distilled insights in memory
+  max_insights: 30
+
+  # How often (in iterations) to consolidate memory
+  consolidation_interval: 10
+
+  # Rolling window used when policy == "regime_aware"
+  regime_lookback_window: 60
+
+# ---------------------------------------------------------------------------
+# Benchmarking and reporting
+# ---------------------------------------------------------------------------
+benchmark:
+  # Execution lane: "paper" for strict reproduction, "research" for Helix extensions
+  mode: "research"
+
+  # Global RNG seed for deterministic benchmark selection and synthesis
+  seed: 42
+
+  # Number of frozen factors selected on the freeze universe/train split
+  freeze_top_k: 40
+
+  # Universe used for Top-K freeze selection
+  freeze_universe: "CSI1000"
+
+  # Universes included in benchmark reporting
+  report_universes:
+    # - "CSI500"
+    - "CSI1000"
+    # - "HS300"
+    # - "Binance"
+
+  # Baselines enabled in the benchmark suite
+  baselines:
+    - "alpha101_classic"
+    - "alpha101_adapted"
+    - "random_exploration"
+    - "gplearn"
+    - "alphaforge_style"
+    - "alphaagent_style"
+    - "factor_miner"
+    - "factor_miner_no_memory"
+
+  # Transaction-cost pressure settings in basis points
+  cost_bps: [1.0, 4.0, 7.0, 10.0, 11.0]
+
+  # Reference panel shape [periods, assets] used for efficiency benchmarks
+  efficiency_panel_shape: [12610, 500]
+
+  # Optional mock benchmark panel shape [periods, assets]. Leave null for the
+  # benchmark's paper-scale mock defaults; CI can set a tiny smoke panel here.
+  mock_panel_shape: null
+
+  # Optional runtime ablation grid over memory policy × dependence metric × backend.
+  # This is only used by the canonical runtime benchmark surface.
+  strategy_ablation:
+    enabled: false
+    baseline: "factor_miner"
+    memory_policies: ["paper", "none", "kg", "family_aware", "regime_aware"]
+    dependence_metrics: ["spearman", "pearson", "distance_correlation"]
+    backends: ["numpy", "c", "gpu"]
+
+# ---------------------------------------------------------------------------
+# Research-first multi-horizon scoring
+# ---------------------------------------------------------------------------
+research:
+  enabled: true
+  # Maximum persisted research hypotheses injected into any generation batch.
+  knowledge_retrieval_limit: 4
+
+  # single_horizon | weighted_multi_horizon | pareto_multi_horizon | net_ir
+  primary_objective: "weighted_multi_horizon"
+
+  # weighted | pareto
+  target_aggregation: "weighted"
+
+  # Optional explicit weights per target name. Empty => infer from data.targets order.
+  horizon_weights: {}
+
+  uncertainty:
+    bootstrap_samples: 200
+    block_size: 20
+    shrinkage_strength: 1.0
+    lcb_zscore: 1.0
+    fdr_alpha: 0.05
+
+  admission:
+    use_residual_ic: true
+    use_effective_rank_gain: true
+    strict_profile: false
+    cross_fit_residual: true
+    turnover_penalty: 0.05
+    redundancy_penalty: 0.20
+    min_score: 0.04
+    min_lcb: 0.0
+    min_residual_ic: 0.02
+    min_span_gain: 0.05
+    min_effective_rank_gain: 0.0
+    min_log_det_gain: -0.10
+    ridge_lambda: 0.001
+    log_det_epsilon: 0.000001
+
+  selection:
+    models: ["ridge", "elastic_net", "lasso", "xgboost"]
+    rolling_train_window: 80
+    rolling_test_window: 20
+    rolling_step: 20
+
+  regimes:
+    enabled: true
+    definition: "return_volatility_liquidity"
+
+  execution:
+    cost_model: "linear_bps"
+    cost_bps: 4.0
+
+# ---------------------------------------------------------------------------
+# Phase 2 advanced features (disabled by default)
+# ---------------------------------------------------------------------------
+phase2:
+  # Causal validation: Granger causality + intervention tests
+  causal:
+    enabled: false
+    granger_max_lag: 5
+    granger_significance: 0.05
+    n_interventions: 3
+    intervention_magnitude: 2.0
+    intervention_ic_threshold: 0.5
+    robustness_threshold: 0.4
+    granger_weight: 0.4
+    intervention_weight: 0.6
+
+  # Regime-conditional evaluation (bull/bear/high-vol/low-vol)
+  regime:
+    enabled: true
+    lookback_window: 60
+    bull_return_threshold: 0.0
+    bear_return_threshold: 0.0
+    volatility_percentile: 0.7
+    min_regime_ic: 0.03
+    min_regimes_passing: 2
+
+  # Strategy capacity estimation
+  capacity:
+    enabled: true
+    base_capital_usd: 100000000.0
+    ic_degradation_limit: 0.20
+    net_icir_threshold: 0.3
+    sigma_annual: 0.25
+
+  # Statistical significance testing (bootstrap + FDR)
+  significance:
+    enabled: true
+    bootstrap_n_samples: 1000
+    bootstrap_block_size: 20
+    bootstrap_method: circular_block
+    fdr_level: 0.05
+    deflated_sharpe_enabled: true
+    min_deflated_sharpe: 0.0
+
+  # Multi-specialist debate-based generation
+  debate:
+    enabled: false
+    num_specialists: 3
+    candidates_per_specialist: 15
+    enable_critic: true
+    top_k_after_critic: 40
+    critic_temperature: 0.3
+
+  # Automatic operator invention
+  auto_inventor:
+    enabled: false
+    invention_interval: 10
+    max_proposals_per_round: 5
+    min_ic_contribution: 0.03
+    store_dir: "./output/custom_operators"
+
+  # Helix knowledge and memory system
+  helix:
+    enabled: false
+    enable_knowledge_graph: false
+    enable_embeddings: false
+    enable_canonicalization: true
+    forgetting_lambda: 0.95
+    forgetting_demotion_threshold: 20

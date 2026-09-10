@@ -16,6 +16,8 @@ from factorminer.utils.config import load_config
 def setup_logging(verbose: bool) -> None:
     """Configure command-line logging without affecting package imports."""
     level = logging.DEBUG if verbose else logging.INFO
+
+    logging.info(f"Setting up logging... (level={level})")
     logging.basicConfig(
         level=level,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -57,7 +59,7 @@ def load_market_frame(cfg, data_path: str | None, mock: bool):
     raw_cfg = getattr(cfg, "_raw", {})
     configured_path = raw_cfg.get("data_path")
 
-    if mock:
+    if mock and data_path is None:
         click.echo("Generating mock market data...")
         from factorminer.data.mock_data import MockConfig, generate_mock_data
 

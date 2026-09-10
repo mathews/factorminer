@@ -424,6 +424,7 @@ class RalphLoop:
         _loop: RalphLoop,
         payload: IterationPayload,
     ) -> list[EvaluationResult]:
+        logger.debug(f"payload ~~ {payload}")
         results = self.pipeline.evaluate_batch(payload.candidates)
         self._annotate_result_lineage(results, payload.library_state)
         self.lifecycle_store.record_batch_results(self.iteration, results)
@@ -503,16 +504,12 @@ class RalphLoop:
             result.parent_formula = str(lineage.get("parent_formula", "") or "")
             parent_ic = lineage.get("parent_ic_paper_mean")
             try:
-                result.parent_ic_paper_mean = (
-                    float(parent_ic) if parent_ic is not None else None
-                )
+                result.parent_ic_paper_mean = float(parent_ic) if parent_ic is not None else None
             except (TypeError, ValueError):
                 result.parent_ic_paper_mean = None
             result.edit_type = str(lineage.get("edit_type", "") or "")
             result.edit_motif = str(lineage.get("edit_motif", "") or "")
-            result.secondary_parent_formula = str(
-                lineage.get("secondary_parent_formula", "") or ""
-            )
+            result.secondary_parent_formula = str(lineage.get("secondary_parent_formula", "") or "")
 
     def _lineage_fields(self, result: EvaluationResult) -> dict[str, Any]:
         return {
@@ -533,10 +530,7 @@ class RalphLoop:
         ``form_memory``. Always merges parent_formula lineage so
         ``EditAwareMemoryPolicy`` can extract edit-motif edges.
         """
-        by_key = {
-            (r.factor_name, r.formula): r
-            for r in results
-        }
+        by_key = {(r.factor_name, r.formula): r for r in results}
         lifecycle_trajectory = self.lifecycle_store.build_trajectory(self.iteration)
         if lifecycle_trajectory:
             trajectory: list[dict[str, Any]] = []
@@ -693,9 +687,7 @@ class RalphLoop:
                     "session": str(checkpoint_dir / "session.json"),
                     "run_manifest": str(checkpoint_dir / "run_manifest.json"),
                     "loop_state": str(checkpoint_dir / "loop_state.json"),
-                    "trial_ledger": str(
-                        Path(checkpoint_dir.parent) / "global_trial_ledger.jsonl"
-                    ),
+                    "trial_ledger": str(Path(checkpoint_dir.parent) / "global_trial_ledger.jsonl"),
                 },
             )
             self._persist_run_manifest(checkpoint_dir / "run_manifest.json")

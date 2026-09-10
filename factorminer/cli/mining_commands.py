@@ -102,9 +102,17 @@ def quickstart(
 @click.option("--iterations", "-n", type=int, default=None, help="Override max_iterations.")
 @click.option("--batch-size", "-b", type=int, default=None, help="Override batch_size.")
 @click.option("--target", "-t", type=int, default=None, help="Override target_library_size.")
-@click.option("--resume", type=click.Path(exists=True), default=None, help="Resume from a saved library.")
+@click.option(
+    "--resume", type=click.Path(exists=True), default=None, help="Resume from a saved library."
+)
 @click.option("--mock", is_flag=True, help="Use mock data and mock LLM provider (for testing).")
-@click.option("--data", "data_path", type=click.Path(exists=True), default=None, help="Path to market data file.")
+@click.option(
+    "--data",
+    "data_path",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to market data file.",
+)
 @click.pass_context
 def mine(
     ctx: click.Context,
@@ -141,14 +149,15 @@ def mine(
     click.echo(f"  Output directory:    {output_dir}")
     click.echo("-" * 60)
 
+    # click.echo(f" config--- {cfg}")
+
     try:
         dataset = _app._load_runtime_dataset_for_analysis(cfg, data_path, mock)
     except Exception as exc:
         click.echo(f"Error loading data: {exc}")
         raise click.Abort() from exc
     click.echo(
-        f"  Data loaded: {len(dataset.asset_ids)} assets x "
-        f"{len(dataset.timestamps)} periods"
+        f"  Data loaded: {len(dataset.asset_ids)} assets x {len(dataset.timestamps)} periods"
     )
     click.echo("  Preparing data tensors...")
     provider = _app._create_llm_provider(cfg, mock)
@@ -200,13 +209,27 @@ def mine(
 @click.option("--iterations", "-n", type=int, default=None, help="Override max_iterations.")
 @click.option("--batch-size", "-b", type=int, default=None, help="Override batch_size.")
 @click.option("--target", "-t", type=int, default=None, help="Override target_library_size.")
-@click.option("--resume", type=click.Path(exists=True), default=None, help="Resume from a saved library.")
+@click.option(
+    "--resume", type=click.Path(exists=True), default=None, help="Resume from a saved library."
+)
 @click.option("--causal/--no-causal", default=None, help="Enable/disable causal validation.")
-@click.option("--regime/--no-regime", default=None, help="Enable/disable regime-conditional evaluation.")
-@click.option("--debate/--no-debate", default=None, help="Enable/disable multi-specialist debate generation.")
-@click.option("--canonicalize/--no-canonicalize", default=None, help="Enable/disable SymPy canonicalization.")
+@click.option(
+    "--regime/--no-regime", default=None, help="Enable/disable regime-conditional evaluation."
+)
+@click.option(
+    "--debate/--no-debate", default=None, help="Enable/disable multi-specialist debate generation."
+)
+@click.option(
+    "--canonicalize/--no-canonicalize", default=None, help="Enable/disable SymPy canonicalization."
+)
 @click.option("--mock", is_flag=True, help="Use mock data and mock LLM provider (for testing).")
-@click.option("--data", "data_path", type=click.Path(exists=True), default=None, help="Path to market data file.")
+@click.option(
+    "--data",
+    "data_path",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to market data file.",
+)
 @click.pass_context
 def helix(
     ctx: click.Context,
@@ -276,9 +299,7 @@ def helix(
     run_context = build_run_context(cfg, output_dir=output_dir, dataset=dataset, mock=mock)
     phase2_configs = _app._build_phase2_runtime_configs(cfg)
     volume = (
-        _app._extract_capacity_volume(dataset.data_tensor)
-        if cfg.phase2.capacity.enabled
-        else None
+        _app._extract_capacity_volume(dataset.data_tensor) if cfg.phase2.capacity.enabled else None
     )
     click.echo("-" * 60)
     click.echo("Starting Helix Loop...")
@@ -307,14 +328,10 @@ def helix(
             enable_knowledge_graph=(
                 cfg.phase2.helix.enabled and cfg.phase2.helix.enable_knowledge_graph
             ),
-            enable_embeddings=(
-                cfg.phase2.helix.enabled and cfg.phase2.helix.enable_embeddings
-            ),
+            enable_embeddings=(cfg.phase2.helix.enabled and cfg.phase2.helix.enable_embeddings),
             enable_auto_inventor=cfg.phase2.auto_inventor.enabled,
             auto_invention_interval=cfg.phase2.auto_inventor.invention_interval,
-            canonicalize=(
-                cfg.phase2.helix.enabled and cfg.phase2.helix.enable_canonicalization
-            ),
+            canonicalize=(cfg.phase2.helix.enabled and cfg.phase2.helix.enable_canonicalization),
             forgetting_lambda=cfg.phase2.helix.forgetting_lambda,
             causal_config=phase2_configs["causal_config"],
             regime_config=phase2_configs["regime_config"],
