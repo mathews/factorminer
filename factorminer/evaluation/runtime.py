@@ -8,6 +8,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 
 from factorminer.core.factor_library import Factor
@@ -217,10 +218,60 @@ class FactorEvaluationArtifact:
     score_vector: dict | None = None
     research_metrics: dict[str, float] = field(default_factory=dict)
     error: str = ""
+    # Set once signals have been computed successfully.  Kept separate from
+    # ``signals_full`` so callers may release the panels (see
+    # :meth:`release_signals`) without the artifact flipping to "failed".
+    signals_ok: bool = False
+    signals_released: bool = False
 
     @property
     def succeeded(self) -> bool:
-        return self.parse_ok and self.signals_full is not None and not self.error
+        if not self.parse_ok or self.error:
+            return False
+        return self.signals_ok or self.signals_full is not None
+
+    @property
+    def has_signals(self) -> bool:
+        """True while at least one signal panel is still resident."""
+        return self.signals_full is not None or bool(self.split_signals)
+
+    def release_signals(self) -> None:
+        """Drop retained signal panels.
+
+        Metrics in ``split_stats`` / ``target_stats`` are preserved, so an
+        artifact stays usable for ranking, freezing and reporting after its
+        (M, T) panels are freed.  This is the primary memory control for large
+        universes: a released artifact costs kilobytes instead of
+        ``M * T * 8`` bytes per retained split.
+        """
+        self.signals_full = None
+        self.split_signals.clear()
+        self.signals_released = True
+
+
+def release_artifact_signals(artifacts) -> int:
+    """Release signal panels on every artifact; returns the count released."""
+    released = 0
+    for artifact in artifacts:
+        if artifact.has_signals:
+            artifact.release_signals()
+            released += 1
+    return released
+
+
+def _contiguous_slice(indices: np.ndarray) -> slice | None:
+    """Return a ``slice`` equivalent to *indices* when they form a single run.
+
+    Benchmark splits are always contiguous in time, so this lets split panels
+    become views of the full panel instead of independent copies.
+    """
+    if indices.size == 0:
+        return None
+    if indices.size == 1:
+        return slice(int(indices[0]), int(indices[0]) + 1)
+    if not np.all(np.diff(indices) == 1):
+        return None
+    return slice(int(indices[0]), int(indices[-1]) + 1)
 
 
 def load_runtime_dataset(
@@ -231,8 +282,9 @@ def load_runtime_dataset(
     from factorminer.data.preprocessor import preprocess
     from factorminer.data.tensor_builder import TensorConfig, build_tensor
 
-    raw_df = raw_df.copy()
-    raw_df["datetime"] = pd.to_datetime(raw_df["datetime"])
+    if not pd.api.types.is_datetime64_any_dtype(raw_df["datetime"]):
+        raw_df = raw_df.copy()
+        raw_df["datetime"] = pd.to_datetime(raw_df["datetime"])
 
     target_specs = _resolve_target_specs(cfg)
     target_df = compute_targets(raw_df, target_specs)
@@ -343,11 +395,62 @@ def evaluate_factors(
     dataset: EvaluationDataset,
     signal_failure_policy: str = "reject",
     target_name: str | None = None,
+    *,
+    retain_splits: Sequence[str] | None = None,
+    retain_full: bool | None = None,
+    signal_dtype: npt.DTypeLike | None = None,
 ) -> list[FactorEvaluationArtifact]:
-    """Recompute factor signals and metrics across all dataset splits."""
+    """Recompute factor signals and metrics across all dataset splits.
+
+    Memory controls
+    ---------------
+    Each retained signal panel costs ``assets * periods * itemsize`` bytes, and
+    a full benchmark keeps one artifact per candidate factor alive at once.  On
+    a CSI1000 daily panel that is ~19 MB per float64 panel, so retention
+    strategy decides whether a large-universe run fits in RAM:
+
+    * Split panels are stored as **views** of the full panel whenever the split
+      is contiguous in time (always true for train/validation/test).  That
+      removes the two redundant full-size copies per factor the previous
+      implementation made, at identical numerical output.
+    * ``retain_splits`` restricts which split panels are kept.  Retained splits
+      are stored as standalone copies so ``signals_full`` can then be dropped.
+      Callers that only need metrics for ranking should pass the single split
+      used for library admission (typically ``("train",)``).
+    * ``retain_full=False`` keeps the per-split panels and drops the full panel.
+    * ``signal_dtype`` stores panels in a narrower dtype (``np.float32`` halves
+      the footprint; signal/IC statistics are unaffected at reporting
+      precision).
+
+    Parameters
+    ----------
+    factors, dataset, signal_failure_policy, target_name
+        As before.
+    retain_splits : sequence of str, optional
+        Split names whose signal panels should be retained.  ``None`` keeps all
+        of them as views of the full panel.
+    retain_full : bool, optional
+        Whether to keep ``signals_full``.  Defaults to ``retain_splits is None``.
+    signal_dtype : dtype-like, optional
+        Storage dtype for retained panels.  ``None`` keeps float64.
+    """
     artifacts: list[FactorEvaluationArtifact] = []
     active_target_name = target_name or dataset.default_target
     active_returns = dataset.get_target(active_target_name)
+
+    keep_splits = None if retain_splits is None else set(retain_splits)
+    keep_full = (keep_splits is None) if retain_full is None else bool(retain_full)
+    # Panels must be detached from the full array whenever the full array is
+    # going to be dropped, otherwise the view would keep it alive anyway.
+    detach = not keep_full or keep_splits is not None
+
+    # Resolve split selectors once instead of per factor.
+    split_selectors: dict[str, slice | np.ndarray] = {}
+    for split_name, split in dataset.splits.items():
+        selector = _contiguous_slice(np.asarray(split.indices))
+        split_selectors[split_name] = (
+            selector if selector is not None else np.asarray(split.indices)
+        )
 
     for factor in factors:
         artifact = FactorEvaluationArtifact(
@@ -383,11 +486,17 @@ def evaluate_factors(
             artifacts.append(artifact)
             continue
 
-        artifact.signals_full = np.asarray(signals, dtype=np.float64)
+        signals = np.asarray(signals, dtype=np.float64)
+        if signal_dtype is not None and np.dtype(signal_dtype) != signals.dtype:
+            signals = signals.astype(signal_dtype, copy=False)
+        artifact.signals_ok = True
 
         for split_name, split in dataset.splits.items():
-            split_signals = artifact.signals_full[:, split.indices]
-            artifact.split_signals[split_name] = split_signals
+            split_signals = signals[:, split_selectors[split_name]]
+            if keep_splits is None or split_name in keep_splits:
+                artifact.split_signals[split_name] = (
+                    np.array(split_signals, copy=True, order="C") if detach else split_signals
+                )
             active_split_target = split.get_target(active_target_name)
             active_stats = compute_factor_stats(split_signals, active_split_target)
             artifact.split_stats[split_name] = active_stats
@@ -399,6 +508,7 @@ def evaluate_factors(
                     else compute_factor_stats(split_signals, split_target)
                 )
 
+        artifact.signals_full = signals if keep_full else None
         artifacts.append(artifact)
 
     return artifacts

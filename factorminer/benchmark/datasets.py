@@ -28,6 +28,8 @@ from factorminer.evaluation.runtime import (
     FactorEvaluationArtifact,
     load_runtime_dataset,
 )
+from factorminer.qlib158_alphas import build_qlib158
+from factorminer.qlib_alpha import build_qlib360
 
 
 def _clone_cfg(cfg):
@@ -158,6 +160,10 @@ def _get_baseline_entries(
                 entries_from_library(load_library(_base_path(factor_miner_no_memory_library_path)))
             )
         return dedupe_entries(build_random_exploration(seed + 101, count=200))
+    if baseline == "qlib158":
+        return dedupe_entries(build_qlib158())
+    if baseline == "qlib360":
+        return dedupe_entries(build_qlib360())
     raise KeyError(f"Unknown benchmark baseline: {baseline}")
 
 

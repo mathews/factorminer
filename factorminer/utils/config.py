@@ -54,6 +54,11 @@ class EvaluationConfig:
     backend: str = "numpy"
     redundancy_metric: str = "spearman"
     signal_failure_policy: str = "reject"
+    # Storage dtype for recomputed factor signal panels. "float64" is the
+    # historical (exact) default; "float32" halves the benchmark memory
+    # footprint, which matters from CSI500 upwards. IC/ICIR statistics are
+    # unaffected at reporting precision.
+    signal_dtype: str = "float64"
 
     def validate(self) -> None:
         if self.num_workers < 1:
@@ -70,6 +75,9 @@ class EvaluationConfig:
             raise ValueError(
                 "signal_failure_policy must be one of: reject, synthetic, raise"
             )
+        if self.signal_dtype not in ("float64", "float32"):
+            raise ValueError(f"signal_dtype must be float64 or float32 (got "
+                             f"'{self.signal_dtype}')")
 
 
 @dataclass

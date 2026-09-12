@@ -62,6 +62,13 @@ evaluation:
   # or "c" (compiled CPU kernels via Bottleneck)
   backend: "numpy"
 
+  # Storage dtype for recomputed (M, T) signal panels.
+  # "float64" = exact historical behaviour. On CSI500/CSI1000 the signal panels
+  # dominate RSS (one panel is M*T*8 bytes): switch to "float32" to halve the
+  # benchmark footprint with no material change to IC/ICIR at reporting precision.
+  # Recommended "float32" for CSI1000 on a 16 GB box.
+  signal_dtype: "float64"
+
   # Redundancy/dependence metric used for admission, replacement,
   # and library geometry diagnostics.
   redundancy_metric: "spearman"
@@ -79,7 +86,7 @@ data:
   market: "a_shares"
 
   # Asset universe filter: "CSI500", "CSI1000", "HS300", "Binance"
-  universe: "CSI1000"
+  universe: "CSI500"
 
   # Bar frequency: "10min", "30min", "1h", "1d"
   frequency: "1d"
@@ -213,15 +220,15 @@ benchmark:
   seed: 42
 
   # Number of frozen factors selected on the freeze universe/train split
-  freeze_top_k: 40
+  freeze_top_k: 300
 
   # Universe used for Top-K freeze selection
-  freeze_universe: "CSI1000"
+  freeze_universe: "CSI500"
 
   # Universes included in benchmark reporting
   report_universes:
-    # - "CSI500"
-    - "CSI1000"
+    - "CSI500"
+    #- "CSI1000"
     # - "HS300"
     # - "Binance"
 
@@ -235,6 +242,8 @@ benchmark:
     - "alphaagent_style"
     - "factor_miner"
     - "factor_miner_no_memory"
+    - "qlib158"
+    - "qlib360"
 
   # Transaction-cost pressure settings in basis points
   cost_bps: [1.0, 4.0, 7.0, 10.0, 11.0]

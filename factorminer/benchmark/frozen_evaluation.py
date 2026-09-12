@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from typing import Any
 
 import numpy as np
+import numpy.typing as npt
 
 from factorminer.benchmark.catalogs import CandidateEntry
 from factorminer.benchmark.contracts import json_safe as _json_safe
@@ -17,6 +18,7 @@ from factorminer.evaluation.runtime import (
     FactorEvaluationArtifact,
     compute_correlation_matrix,
     evaluate_factors,
+    release_artifact_signals,
 )
 
 
@@ -195,6 +197,7 @@ def evaluate_frozen_set(
     n_trials: int = 1,
     include_capacity_evidence: bool = False,
     family_ic_series: dict[str, np.ndarray] | None = None,
+    signal_dtype: npt.DTypeLike | None = None,
 ) -> dict:
     """Evaluate one frozen factor set on one universe."""
     if cost_bps is None:
@@ -210,7 +213,17 @@ def evaluate_frozen_set(
         )
         for artifact in frozen
     )
-    artifacts = evaluate_factors(factors, dataset, signal_failure_policy="reject")
+    # Only the fit split (for weighting/selection) and the held-out split (for
+    # scoring) are consumed below; retaining every split panel would cost
+    # ``len(frozen) * splits`` full (M, T) arrays for no benefit.
+    needed_splits = tuple(dict.fromkeys((fit_split, split_name)))
+    artifacts = evaluate_factors(
+        factors,
+        dataset,
+        signal_failure_policy="reject",
+        retain_splits=needed_splits,
+        signal_dtype=signal_dtype,
+    )
     succeeded = [artifact for artifact in artifacts if artifact.succeeded]
 
     result = {
@@ -239,6 +252,7 @@ def evaluate_frozen_set(
     }
     if not succeeded:
         result["warnings"].append("No frozen factors recomputed successfully on this universe")
+        release_artifact_signals(artifacts)
         return result
 
     result["library"] = {
@@ -424,4 +438,7 @@ def evaluate_frozen_set(
             ),
         }
 
+    # ``result`` holds only scalars and small series; the (M, T) panels are the
+    # dominant allocation of the whole benchmark and are no longer reachable.
+    release_artifact_signals(artifacts)
     return result

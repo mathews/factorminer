@@ -131,10 +131,16 @@ from factorminer.benchmark.statistics import (
 from factorminer.evaluation.metrics import METRIC_VERSION
 from factorminer.evaluation.runtime import (
     evaluate_factors,
+    release_artifact_signals,
 )
 from factorminer.operators.c_backend import backend_available as c_backend_available
 
 logger = logging.getLogger(__name__)
+
+
+def _signal_dtype(cfg) -> np.dtype:
+    """Signal storage dtype from config (``float64`` unless narrowed)."""
+    return np.dtype(getattr(cfg.evaluation, "signal_dtype", "float64") or "float64")
 
 
 def _industry_evidence_config(cfg, cost_bps: list[float]):
@@ -244,10 +250,14 @@ def run_table1_benchmark(
             )
             candidate_count = len(entries)
 
+        # Library admission reads only the train split; every other split panel
+        # would be dead weight for the whole candidate set.
         artifacts = evaluate_factors(
             factors,
             freeze_dataset,
             signal_failure_policy="reject",
+            retain_splits=("train",),
+            signal_dtype=_signal_dtype(cfg),
         )
 
         library_cfg = _cfg_with_overrides(cfg, cfg.benchmark.freeze_universe)
@@ -270,6 +280,11 @@ def run_table1_benchmark(
             top_k=cfg.benchmark.freeze_top_k,
             split_name=selection_split,
         )
+        # ``evaluate_frozen_set`` rebuilds factors from name/formula/category and
+        # recomputes every signal on the report universe, so the freeze-universe
+        # panels are unreachable from here on.  Dropping them now avoids holding
+        # two full candidate sets (freeze + frozen) resident at the same time.
+        release_artifact_signals(artifacts)
 
         baseline_result = {
             "baseline": baseline,
@@ -351,6 +366,7 @@ def run_table1_benchmark(
                 n_trials=candidate_count,
                 include_capacity_evidence=bool(cfg.phase2.capacity.enabled),
                 family_ic_series=family_ic_series,
+                signal_dtype=_signal_dtype(cfg),
             )
 
         result_path = benchmark_dir / f"{baseline}.json"
