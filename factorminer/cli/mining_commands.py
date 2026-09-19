@@ -153,6 +153,9 @@ def mine(
 
     try:
         dataset = _app._load_runtime_dataset_for_analysis(cfg, data_path, mock)
+        if cfg.research.planner.enabled:
+            from factorminer.application.research_actions import discovery_dataset
+            dataset = discovery_dataset(dataset)
     except Exception as exc:
         click.echo(f"Error loading data: {exc}")
         raise click.Abort() from exc
@@ -189,7 +192,7 @@ def mine(
             library=library,
             run_context=run_context,
         )
-        result_library = loop.run(callback=progress)
+        result_library = loop.run(callback=progress, resume=not bool(resume))
     except KeyboardInterrupt:
         click.echo("\nMining interrupted by user.")
         return
@@ -286,6 +289,9 @@ def helix(
         click.echo(f"  Resuming from: {resume}")
     try:
         dataset = _app._load_runtime_dataset_for_analysis(cfg, data_path, mock)
+        if cfg.research.planner.enabled:
+            from factorminer.application.research_actions import discovery_dataset
+            dataset = discovery_dataset(dataset)
     except Exception as exc:
         click.echo(f"Error loading data: {exc}")
         raise click.Abort() from exc
@@ -339,7 +345,7 @@ def helix(
             significance_config=phase2_configs["significance_config"],
             volume=volume,
         )
-        result_library = loop.run(callback=progress)
+        result_library = loop.run(callback=progress, resume=not bool(resume))
     except KeyboardInterrupt:
         click.echo("\nHelix mining interrupted by user.")
         return

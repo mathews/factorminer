@@ -442,13 +442,19 @@ def _doctor_checks(cfg, raw: dict, output_dir: Path) -> list[dict]:
         "faiss-cpu": "faiss",
     }
     for package, module in optional_modules.items():
-        m_spec = None
         try:
-            m_spec = find_spec(module)
-        except:
-            pass
-
-        if m_spec is None:
+            module_spec = find_spec(module)
+        except (ImportError, ValueError) as exc:
+            # Dotted lookups can fail on the parent; loaded modules may lack a spec.
+            checks.append(
+                _check(
+                    "warning",
+                    f"optional:{package}",
+                    f"Unavailable ({type(exc).__name__})",
+                )
+            )
+            continue
+        if module_spec is None:
             checks.append(_check("warning", f"optional:{package}", "Not installed"))
         else:
             checks.append(_check("ok", f"optional:{package}", "Installed"))
