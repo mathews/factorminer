@@ -17,6 +17,7 @@ except ImportError:
 # NumPy implementations
 # ===========================================================================
 
+
 def delta_np(x: np.ndarray, window: int = 1) -> np.ndarray:
     """x[t] - x[t - period]."""
     window = int(window)
@@ -60,6 +61,7 @@ def log_return_np(x: np.ndarray, window: int = 1) -> np.ndarray:
         prev = x[:, :-window]
         curr = x[:, window:]
         with np.errstate(invalid="ignore", divide="ignore"):
+            # FIXME
             ratio = np.where(np.abs(prev) > 1e-10, curr / prev, np.nan)
             out[:, window:] = np.where(ratio > 0, np.log(ratio), np.nan)
     return out
@@ -85,8 +87,9 @@ def corr_np(x: np.ndarray, y: np.ndarray, window: int = 10) -> np.ndarray:
     dy = wy - my
     with np.errstate(invalid="ignore", divide="ignore"):
         cov = np.nanmean(dx * dy, axis=2)
-        sx = np.sqrt(np.nanmean(dx ** 2, axis=2))
-        sy = np.sqrt(np.nanmean(dy ** 2, axis=2))
+        sx = np.sqrt(np.nanmean(dx**2, axis=2))
+        sy = np.sqrt(np.nanmean(dy**2, axis=2))
+        # FIXME
         result = np.where((sx > 1e-10) & (sy > 1e-10), cov / (sx * sy), np.nan)
     return _pad_front(result, window, T)
 
@@ -130,8 +133,9 @@ def beta_np(x: np.ndarray, y: np.ndarray, window: int = 10) -> np.ndarray:
     dy = wy - my
     dx = wx - mx
     with np.errstate(invalid="ignore", divide="ignore"):
-        var_y = np.nanmean(dy ** 2, axis=2)
+        var_y = np.nanmean(dy**2, axis=2)
         cov_xy = np.nanmean(dx * dy, axis=2)
+        # FIXME
         result = np.where(var_y > 1e-10, cov_xy / var_y, np.nan)
     return _pad_front(result, window, T)
 
@@ -155,8 +159,9 @@ def resid_np(x: np.ndarray, y: np.ndarray, window: int = 10) -> np.ndarray:
     dx = wx - mx
     dy = wy - my
     with np.errstate(invalid="ignore", divide="ignore"):
-        var_y = np.nanmean(dy ** 2, axis=2, keepdims=True)
+        var_y = np.nanmean(dy**2, axis=2, keepdims=True)
         cov_xy = np.nanmean(dx * dy, axis=2, keepdims=True)
+        # FIXME
         b = np.where(var_y > 1e-10, cov_xy / var_y, 0.0)
         a = mx - b * my
     # Residual at last time step in each window
@@ -210,6 +215,7 @@ def cummin_np(x: np.ndarray) -> np.ndarray:
 # ===========================================================================
 # PyTorch implementations
 # ===========================================================================
+
 
 def delta_torch(x: torch.Tensor, window: int = 1) -> torch.Tensor:
     window = int(window)
@@ -273,8 +279,9 @@ def corr_torch(x: torch.Tensor, y: torch.Tensor, window: int = 10) -> torch.Tens
     cov = (dx * dy).nanmean(dim=2)
     sx = dx.square().nanmean(dim=2).sqrt()
     sy = dy.square().nanmean(dim=2).sqrt()
-    result = torch.where((sx > 1e-10) & (sy > 1e-10), cov / (sx * sy),
-                         torch.tensor(float("nan"), device=x.device))
+    result = torch.where(
+        (sx > 1e-10) & (sy > 1e-10), cov / (sx * sy), torch.tensor(float("nan"), device=x.device)
+    )
     return _pad_front_torch(result, window, T)
 
 
@@ -304,8 +311,7 @@ def beta_torch(x: torch.Tensor, y: torch.Tensor, window: int = 10) -> torch.Tens
     dy = wy - my
     var_y = dy.square().nanmean(dim=2)
     cov_xy = (dx * dy).nanmean(dim=2)
-    result = torch.where(var_y > 1e-10, cov_xy / var_y,
-                         torch.tensor(float("nan"), device=x.device))
+    result = torch.where(var_y > 1e-10, cov_xy / var_y, torch.tensor(float("nan"), device=x.device))
     return _pad_front_torch(result, window, T)
 
 

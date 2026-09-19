@@ -26,6 +26,7 @@ _EPS = 1e-10
 # Node hierarchy
 # ---------------------------------------------------------------------------
 
+
 class Node(ABC):
     """Abstract base for every node in an expression tree."""
 
@@ -88,16 +89,14 @@ class LeafNode(Node):
     def __init__(self, feature_name: str) -> None:
         if feature_name not in get_feature_set():
             raise ValueError(
-                f"Unknown feature '{feature_name}'. "
-                f"Expected one of {sorted(get_feature_set())}."
+                f"Unknown feature '{feature_name}'. Expected one of {sorted(get_feature_set())}."
             )
         self.feature_name = feature_name
 
     def evaluate(self, data: dict[str, np.ndarray]) -> np.ndarray:
         if self.feature_name not in data:
             raise KeyError(
-                f"Feature '{self.feature_name}' not found in data. "
-                f"Available: {sorted(data.keys())}"
+                f"Feature '{self.feature_name}' not found in data. Available: {sorted(data.keys())}"
             )
         return data[self.feature_name].astype(np.float64, copy=False)
 
@@ -215,6 +214,7 @@ class OperatorNode(Node):
 # Operator dispatch  (pure-numpy implementations)
 # ---------------------------------------------------------------------------
 
+
 def _safe_div(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     """Division that returns 0 where the denominator is near zero.
 
@@ -223,7 +223,10 @@ def _safe_div(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     """
     mask = np.abs(b) > _EPS
     with np.errstate(divide="ignore", invalid="ignore"):
-        return np.where(mask, a / b, 0.0)
+        # return np.where(mask, a / b, 0.0)
+        out = np.zeros_like(a)
+        np.divide(a, b, out=out, where=mask)
+        return out
 
 
 def _safe_log(x: np.ndarray) -> np.ndarray:
@@ -390,7 +393,11 @@ def _ts_corr(sx: np.ndarray, sy: np.ndarray) -> np.ndarray:
     sx_std = np.sqrt(_row_nanvar(sx))
     sy_std = np.sqrt(_row_nanvar(sy))
     denom = sx_std * sy_std
-    return np.where(denom > _EPS, cov / denom, 0.0)
+
+    # return np.where(denom > _EPS, cov / denom, 0.0)
+    out = np.zeros_like(cov)
+    np.divide(cov, denom, out=out, where=denom > _EPS)
+    return out
 
 
 def _ts_cov(sx: np.ndarray, sy: np.ndarray) -> np.ndarray:
@@ -404,9 +411,12 @@ def _ts_beta(sx: np.ndarray, sy: np.ndarray) -> np.ndarray:
     my = _row_nanmean(sy, keepdims=True)
     mx = _row_nanmean(sx, keepdims=True)
     dy = sy - my
-    var_y = np.nansum(dy ** 2, axis=1)
+    var_y = np.nansum(dy**2, axis=1)
     cov_xy = np.nansum((sx - mx) * dy, axis=1)
-    return np.where(var_y > _EPS, cov_xy / var_y, 0.0)
+    # return np.where(var_y > _EPS, cov_xy / var_y, 0.0)
+    out = np.zeros_like(cov_xy)
+    np.divide(cov_xy, var_y, out=out, where=var_y > _EPS)
+    return out
 
 
 def _ts_resid(sx: np.ndarray, sy: np.ndarray) -> np.ndarray:
@@ -561,11 +571,18 @@ def _ts_linreg_rsquare(x: np.ndarray, window: int) -> np.ndarray:
         fitted = slope[:, None] * t_vals[None, :] + intercept[:, None]
         ss_res = np.nansum((sx - fitted) ** 2, axis=1)
         ss_tot = np.nansum((sx - x_mean) ** 2, axis=1)
-        out[:, t] = np.where(ss_tot > _EPS, 1.0 - ss_res / ss_tot, np.nan)
+        # out[:, t] = np.where(ss_tot > _EPS, 1.0 - ss_res / ss_tot, np.nan)
+        out[:, t] = 1.0 - np.divide(
+            ss_res,
+            ss_tot,
+            out=np.full_like(ss_tot, np.nan, dtype=float),
+            where=ss_tot > _EPS,
+        )
     return out
 
 
 # Main dispatch table -------------------------------------------------------
+
 
 def _dispatch_operator(
     spec: OperatorSpec,
@@ -651,9 +668,7 @@ def _dispatch_operator(
         return _rolling_apply(children[0], w, _ts_rank)
     if name == "Quantile":
         q = params.get("q", 0.5)
-        return _rolling_apply(
-            children[0], w, lambda sx: np.nanquantile(sx, q, axis=1)
-        )
+        return _rolling_apply(children[0], w, lambda sx: np.nanquantile(sx, q, axis=1))
     if name == "CountNaN":
         return _rolling_apply(
             children[0], w, lambda sx: np.sum(np.isnan(sx), axis=1).astype(np.float64)
@@ -687,7 +702,10 @@ def _dispatch_operator(
         M, T = children[0].shape
         out = np.full_like(children[0], np.nan, dtype=np.float64)
         if w < T:
-            ratio = _safe_div(children[0][:, w:], np.where(np.abs(children[0][:, :-w]) > _EPS, children[0][:, :-w], 1.0))
+            ratio = _safe_div(
+                children[0][:, w:],
+                np.where(np.abs(children[0][:, :-w]) > _EPS, children[0][:, :-w], 1.0),
+            )
             out[:, w:] = np.log(np.abs(ratio) + _EPS)
         return out
     if name == "Corr":
@@ -788,6 +806,7 @@ def _dispatch_operator(
 # ---------------------------------------------------------------------------
 # Expression tree wrapper
 # ---------------------------------------------------------------------------
+
 
 class ExpressionTree:
     """Wrapper around a root ``Node`` providing a convenient API.

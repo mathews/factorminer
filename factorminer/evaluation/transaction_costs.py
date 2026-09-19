@@ -22,6 +22,7 @@ import numpy as np
 # Result containers
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class TradingCosts:
     """Aggregated transaction costs for a single rebalance event.
@@ -60,6 +61,7 @@ class TradingCosts:
 # ---------------------------------------------------------------------------
 # Market impact model (Almgren-Chriss)
 # ---------------------------------------------------------------------------
+
 
 class MarketImpactModel:
     """Almgren-Chriss (2001) market impact model.
@@ -142,7 +144,9 @@ class MarketImpactModel:
         direction = np.asarray(direction, dtype=np.float64)
 
         # Participation rate: what fraction of ADV are we trading
-        participation = np.where(adv > 0, trade_size / adv, 0.0)
+        # participation = np.where(adv > 0, trade_size / adv, 0.0)
+        participation = np.zeros_like(trade_size)
+        np.divide(trade_size, adv, out=participation, where=adv > 0)
 
         # Permanent impact: lambda * sigma * participation^alpha
         # Ref: Almgren (2001) eq. (2.4) – permanent impact g(v) = lambda * sigma * |x|^alpha
@@ -166,6 +170,7 @@ class MarketImpactModel:
 # ---------------------------------------------------------------------------
 # Slippage model (bid-ask spread)
 # ---------------------------------------------------------------------------
+
 
 class SlippageModel:
     """Bid-ask spread slippage model.
@@ -245,6 +250,7 @@ class SlippageModel:
 # Aggregated transaction cost calculator
 # ---------------------------------------------------------------------------
 
+
 class TransactionCostCalculator:
     """Aggregate all transaction cost components for a portfolio rebalance.
 
@@ -312,7 +318,7 @@ class TransactionCostCalculator:
         adv: np.ndarray,
         volatility: np.ndarray,
         portfolio_value: float,
-        market: str = 'ashare',
+        market: str = "ashare",
         spread_bps: np.ndarray | None = None,
         urgency: float = 0.5,
     ) -> TradingCosts:
@@ -353,9 +359,9 @@ class TransactionCostCalculator:
         volatility = np.asarray(volatility, dtype=np.float64)
 
         # Weight deltas and trade notional
-        delta_weights = new_weights - old_weights                     # signed
-        trade_notional = np.abs(delta_weights) * portfolio_value      # always >= 0
-        trade_direction = np.sign(delta_weights)                      # +1 buy, -1 sell
+        delta_weights = new_weights - old_weights  # signed
+        trade_notional = np.abs(delta_weights) * portfolio_value  # always >= 0
+        trade_direction = np.sign(delta_weights)  # +1 buy, -1 sell
 
         # One-way turnover: sum of absolute weight changes, divided by 2 to
         # avoid double-counting buys and sells for a fully-funded portfolio.
@@ -375,9 +381,7 @@ class TransactionCostCalculator:
         # Portfolio-level impact = notional-weighted average across traded assets
         total_trade_notional = float(np.sum(trade_notional))
         if total_trade_notional > 1e-12:
-            impact_bps = float(
-                np.sum(impact_bps_per_asset * trade_notional) / total_trade_notional
-            )
+            impact_bps = float(np.sum(impact_bps_per_asset * trade_notional) / total_trade_notional)
         else:
             impact_bps = 0.0
 
@@ -408,7 +412,7 @@ class TransactionCostCalculator:
         # 4. Stamp duty (sell side only)
         # ----------------------------------------------------------------
         effective_stamp = 0.0
-        if market == 'ashare':
+        if market == "ashare":
             # Identify sell trades: delta_weight < 0 (reducing long) or
             # delta_weight > 0 but old position was short (increasing short sell).
             # Simplified: stamp duty on any reduction of long exposure.
@@ -424,28 +428,15 @@ class TransactionCostCalculator:
         # Per-bar financing cost on leveraged portion.  For a bar-length h:
         #   financing_cost = leverage * overnight_rate_annual / bars_per_year
         if self.overnight_rate_annual > 0:
-            leverage = max(
-                float(np.sum(np.abs(new_weights))) - 1.0, 0.0
-            )  # excess over 1x
-            financing_bps = (
-                leverage
-                * self.overnight_rate_annual
-                / self.bars_per_year
-                * 1e4
-            )
+            leverage = max(float(np.sum(np.abs(new_weights))) - 1.0, 0.0)  # excess over 1x
+            financing_bps = leverage * self.overnight_rate_annual / self.bars_per_year * 1e4
         else:
             financing_bps = 0.0
 
         # ----------------------------------------------------------------
         # Aggregate
         # ----------------------------------------------------------------
-        total_bps = (
-            impact_bps
-            + slippage_bps
-            + commission_bps
-            + effective_stamp
-            + financing_bps
-        )
+        total_bps = impact_bps + slippage_bps + commission_bps + effective_stamp + financing_bps
 
         details = {
             "impact_bps_per_asset": impact_bps_per_asset,
@@ -533,5 +524,5 @@ class TransactionCostCalculator:
             ),
             slippage_model=SlippageModel(default_spread_bps=default_spread_bps),
             commission_bps=commission_bps,
-            stamp_duty_bps=0.0,   # no stamp duty on crypto
+            stamp_duty_bps=0.0,  # no stamp duty on crypto
         )

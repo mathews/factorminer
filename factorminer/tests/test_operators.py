@@ -16,6 +16,7 @@ from factorminer.operators.registry import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _arr(*rows):
     """Build a (M, T) float64 array from nested lists."""
     return np.array(rows, dtype=np.float64)
@@ -41,6 +42,7 @@ def y_simple():
 # ---------------------------------------------------------------------------
 # Arithmetic operators
 # ---------------------------------------------------------------------------
+
 
 class TestArithmeticOps:
     """Test element-wise arithmetic operators."""
@@ -105,7 +107,7 @@ class TestArithmeticOps:
 
     def test_square(self, x_simple):
         result = execute_operator("Square", x_simple)
-        np.testing.assert_array_almost_equal(result, x_simple ** 2)
+        np.testing.assert_array_almost_equal(result, x_simple**2)
 
     def test_inv_zero_returns_nan(self):
         x = _arr([0, 1, 2], [3, 0, 5])
@@ -172,6 +174,7 @@ class TestArithmeticOps:
 # ---------------------------------------------------------------------------
 # Statistical operators (rolling window)
 # ---------------------------------------------------------------------------
+
 
 class TestStatisticalOps:
     """Test rolling-window statistical operators."""
@@ -248,6 +251,7 @@ class TestStatisticalOps:
 # Time-series operators
 # ---------------------------------------------------------------------------
 
+
 class TestTimeseriesOps:
     """Test time-series operators like Delta, Delay, Return."""
 
@@ -303,6 +307,7 @@ class TestTimeseriesOps:
 # Cross-sectional operators
 # ---------------------------------------------------------------------------
 
+
 class TestCrossSectionalOps:
     """Test cross-sectional operators."""
 
@@ -344,12 +349,15 @@ class TestCrossSectionalOps:
 
     def test_scale_alias(self):
         x = _arr([1], [2], [3])
-        np.testing.assert_array_almost_equal(execute_operator("Scale", x), execute_operator("CsScale", x))
+        np.testing.assert_array_almost_equal(
+            execute_operator("Scale", x), execute_operator("CsScale", x)
+        )
 
 
 # ---------------------------------------------------------------------------
 # Smoothing operators
 # ---------------------------------------------------------------------------
+
 
 class TestSmoothingOps:
     """Test smoothing / moving average operators."""
@@ -389,10 +397,9 @@ class TestSmoothingOps:
         ref = np.copy(x).astype(np.float64)
         for t in range(window, x.shape[1]):
             direction = np.abs(x[:, t] - x[:, t - window])
-            volatility = np.nansum(
-                np.abs(np.diff(x[:, t - window : t + 1], axis=1)), axis=1
-            )
+            volatility = np.nansum(np.abs(np.diff(x[:, t - window : t + 1], axis=1)), axis=1)
             with np.errstate(invalid="ignore", divide="ignore"):
+                # FIXME
                 er = np.where(volatility > 1e-10, direction / volatility, 0.0)
             sc = (er * (fast_sc - slow_sc) + slow_sc) ** 2
             prev = ref[:, t - 1]
@@ -405,6 +412,7 @@ class TestSmoothingOps:
 # ---------------------------------------------------------------------------
 # Regression operators
 # ---------------------------------------------------------------------------
+
 
 class TestRegressionOps:
     """Test rolling regression operators."""
@@ -450,6 +458,7 @@ class TestRegressionOps:
 # Logical operators
 # ---------------------------------------------------------------------------
 
+
 class TestLogicalOps:
     """Test conditional and comparison operators."""
 
@@ -482,9 +491,13 @@ class TestLogicalOps:
     def test_paper_comparison_aliases(self):
         x = _arr([1, 5, 3])
         y = _arr([2, 3, 3])
-        np.testing.assert_array_almost_equal(execute_operator("GreaterEqual", x, y), _arr([0, 1, 1]))
+        np.testing.assert_array_almost_equal(
+            execute_operator("GreaterEqual", x, y), _arr([0, 1, 1])
+        )
         np.testing.assert_array_almost_equal(execute_operator("LessEqual", x, y), _arr([1, 0, 1]))
-        np.testing.assert_array_almost_equal(execute_operator("Eq", x, y), execute_operator("Equal", x, y))
+        np.testing.assert_array_almost_equal(
+            execute_operator("Eq", x, y), execute_operator("Equal", x, y)
+        )
         np.testing.assert_array_almost_equal(execute_operator("Ne", x, y), _arr([1, 1, 0]))
 
     def test_and(self):
@@ -511,6 +524,7 @@ class TestLogicalOps:
 # ---------------------------------------------------------------------------
 # NaN propagation
 # ---------------------------------------------------------------------------
+
 
 class TestNaNPropagation:
     """Test NaN handling across operators."""
@@ -540,6 +554,7 @@ class TestNaNPropagation:
 # GPU (torch) vs CPU equivalence
 # ---------------------------------------------------------------------------
 
+
 class TestGPUCPUEquivalence:
     """Test that torch and numpy implementations produce similar results."""
 
@@ -558,17 +573,13 @@ class TestGPUCPUEquivalence:
         spec = get_operator(op_name)
         if spec.arity == 1:
             np_result = execute_operator(op_name, x_simple, backend="numpy")
-            torch_result = execute_operator(
-                op_name, th.tensor(x_simple), backend="torch"
-            )
+            torch_result = execute_operator(op_name, th.tensor(x_simple), backend="torch")
         else:
             np_result = execute_operator(op_name, x_simple, y_simple, backend="numpy")
             torch_result = execute_operator(
                 op_name, th.tensor(x_simple), th.tensor(y_simple), backend="torch"
             )
-        np.testing.assert_array_almost_equal(
-            np_result, torch_result.numpy(), decimal=5
-        )
+        np.testing.assert_array_almost_equal(np_result, torch_result.numpy(), decimal=5)
 
     @pytest.mark.parametrize("op_name", ["Mean", "Std", "TsMax", "TsMin"])
     def test_statistical_equivalence(self, torch_available, x_simple, op_name):
@@ -591,9 +602,7 @@ class TestGPUCPUEquivalence:
         rng = np.random.default_rng(17)
         panel = rng.normal(size=(12, 50))
         panel[rng.random(panel.shape) < 0.1] = np.nan
-        np_result = execute_operator(
-            op_name, panel, params={"window": 7}, backend="numpy"
-        )
+        np_result = execute_operator(op_name, panel, params={"window": 7}, backend="numpy")
         torch_result = execute_operator(
             op_name,
             th.tensor(panel, dtype=th.float64),
@@ -609,9 +618,7 @@ class TestGPUCPUEquivalence:
         )
 
     @pytest.mark.parametrize("op_name,min_obs", [("Skew", 3), ("Kurt", 4)])
-    def test_higher_moment_equivalence_and_nan_guards(
-        self, torch_available, op_name, min_obs
-    ):
+    def test_higher_moment_equivalence_and_nan_guards(self, torch_available, op_name, min_obs):
         """Regression: numpy Skew/Kurt lacked the torch backends' minimum
         valid-count guards, returning finite noise from windows with too few
         observations where torch returns NaN. NaN masks must now match
@@ -631,9 +638,7 @@ class TestGPUCPUEquivalence:
         np.testing.assert_array_equal(np.isnan(np_result), np.isnan(torch_result))
         valid = ~np.isnan(np_result)
         assert valid.any()
-        np.testing.assert_array_almost_equal(
-            np_result[valid], torch_result[valid], decimal=4
-        )
+        np.testing.assert_array_almost_equal(np_result[valid], torch_result[valid], decimal=4)
         if min_obs == 4:
             # alternating-NaN windows never reach 4 valid obs -> all NaN
             assert np.isnan(np_result[1, 4:]).all()
@@ -642,6 +647,7 @@ class TestGPUCPUEquivalence:
 # ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
+
 
 class TestRegistry:
     """Test operator registry functions."""
