@@ -1,0 +1,67 @@
+exec bwrap
+--ro-bind /usr /usr
+--ro-bind /bin /bin
+--ro-bind /sbin /sbin
+--ro-bind /lib /lib
+--ro-bind /lib64 /lib64
+--ro-bind /etc /etc
+--bind /data/local_data /data/local_data
+--bind '/home/mathews/.config/CodeBuddy CN' '/data/local_data/.config/CodeBuddy CN'
+--bind /home/mathews/.config/clawhub /data/local_data/.config/clawhub
+--bind /home/mathews/.config/WorkBuddy /data/local_data/.config/WorkBuddy
+--bind /home/mathews/.local/bin /data/local_data/.local/bin
+--bind /home/mathews/.local/share/codebuddy /data/local_data/.local/share/codebuddy
+--bind /home/mathews/.local/share/CodeBuddyExtension /data/local_data/.local/share/CodeBuddyExtension
+--bind /home/mathews/.codebuddy /data/local_data/.codebuddy
+--bind /home/mathews/.codebuddycn /data/local_data/.codebuddycn
+--bind /home/mathews/.openclaw /data/local_data/.openclaw
+--bind /home/mathews/.workbuddy /data/local_data/.workbuddy
+--bind /home/mathews/.workbuddy-key-fallback /data/local_data/.workbuddy-key-fallback
+--bind /home/mathews/WorkBuddy /data/local_data/WorkBuddy
+--bind /opt/WorkBuddy /opt/WorkBuddy
+--dev /dev
+--proc /proc
+--proc /proc
+--bind /dev/shm /dev/shm
+--tmpfs /tmp
+--dir /var
+--dir /run
+--clearenv
+--setenv HOME /data/local_data
+--setenv XDG_CONFIG_HOME /home/mathews/.config
+--setenv XDG_DATA_HOME /home/mathews/.local/share
+--setenv XDG_CACHE_HOME /home/mathews/.cache
+--setenv TERM xterm-256color
+--setenv PATH /usr/bin:/bin:/usr/local/bin:/data/.local/bin:/data/local_data/.npm-global/bin:/data/local_data/.nvm/versions/node/v26.8.1/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/share/buddycn/bin:/data/local_data/.local/share/codebuddy/versions/2.147.0:/opt/WorkBuddy:/usr/share/buddycn/bin
+--unshare-uts
+--hostname buddycn-box
+--die-with-parent
+--bind /run/dbus/system_bus_socket /run/dbus/system_bus_socket
+--bind /home/mathews/projects /data/local_data/projects
+--ro-bind /home/mathews/.gitconfig /data/local_data/.gitconfig
+--ro-bind /home/mathews/.npmrc /data/local_data/.npmrc
+--ro-bind /run/user/1000/wayland-0 /run/user/1000/wayland-0
+--setenv WAYLAND_DISPLAY wayland-0
+--ro-bind /run/user/1000/.mutter-Xwaylandauth.FOKKV3 /run/user/1000/.mutter-Xwaylandauth.FOKKV3
+--setenv XAUTHORITY /run/user/1000/.mutter-Xwaylandauth.FOKKV3
+--bind /tmp/.X11-unix /tmp/.X11-unix
+--setenv DISPLAY :0
+--dev-bind /dev/dri /dev/dri
+--ro-bind /sys/dev/char /sys/dev/char
+--ro-bind /sys/devices /sys/devices
+--setenv WAYLAND_DISPLAY wayland-0
+--setenv XDG_RUNTIME_DIR /run/user/1000
+--setenv VK_DRIVER_FILES /usr/share/vulkan/icd.d/nvidia_icd.json
+--bind /run/user/1000/bus /run/user/1000/bus
+--setenv DBUS_SESSION_BUS_ADDRESS unix:path=/run/user/1000/bus
+--bind /run/user/1000/pipewire-0 /run/user/1000/pipewire-0
+--bind /run/user/1000/pulse /run/user/1000/pulse
+--dev-bind /dev/dri /dev/dri
+--dev-bind /dev/dri/renderD128 /dev/dri/renderD128
+--dev-bind /dev/dri/renderD129 /dev/dri/renderD129
+
+--ro-bind /run/systemd/resolve /run/systemd/resolve
+--new-session
+--share-net
+/usr/share/buddycn/bin/buddycn
+--ozone-platform=wayland --no-sandbox

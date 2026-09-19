@@ -501,8 +501,12 @@ class OpenAICompatibleProvider(LLMProvider):
             temperature,
             self.timeout_s,
         )
-        response = client.chat.completions.create(**kwargs)
-        text = response.choices[0].message.content or ""
+        text = ""
+        try:
+            response = client.chat.completions.create(**kwargs)
+            text = response.choices[0].message.content or ""
+        except Exception:
+            logger.error(f"error to get response from LLM, {self.base_url}, {(self.model,)}")
         logger.debug("OpenAI-compatible response: %d chars", len(text))
         return text
 
@@ -591,8 +595,7 @@ class CascadeProvider(LLMProvider):
         self.escalations += 1
         self.frontier_calls += 1
         logger.info(
-            "Cascade: escalating to frontier after draft parse failure "
-            "(draft=%s frontier=%s)",
+            "Cascade: escalating to frontier after draft parse failure (draft=%s frontier=%s)",
             self.draft.provider_name,
             self.frontier.provider_name,
         )
@@ -651,7 +654,10 @@ class MockProvider(LLMProvider):
         ("volatility_ratio", "Div(Std($returns, 5), Std($returns, 20))"),
         ("mean_reversion", "Neg(CsZScore(Div(Sub($close, SMA($close, 20)), SMA($close, 20))))"),
         ("volume_trend", "CsRank(TsLinRegSlope($volume, 20))"),
-        ("price_position", "CsRank(Div(Sub($close, TsMin($close, 20)), Sub(TsMax($close, 20), TsMin($close, 20))))"),
+        (
+            "price_position",
+            "CsRank(Div(Sub($close, TsMin($close, 20)), Sub(TsMax($close, 20), TsMin($close, 20))))",
+        ),
         ("amt_volume_div", "CsRank(Neg(Corr(CsRank($amt), CsRank($volume), 10)))"),
         ("weighted_return", "CsZScore(WMA($returns, 10))"),
         ("high_low_decay", "Neg(Decay(Div(Sub($high, $low), $close), 10))"),
@@ -663,10 +669,16 @@ class MockProvider(LLMProvider):
         ("kurtosis_signal", "CsZScore(Neg(Kurt($returns, 20)))"),
         ("vwap_trend", "CsRank(TsLinRegSlope(Div($close, $vwap), 20))"),
         ("adaptive_mean", "CsRank(Div(Sub($close, KAMA($close, 10)), Std($close, 10)))"),
-        ("cumulative_flow", "CsZScore(CsRank(Delta(CumSum(Mul($volume, Sign(Delta($close, 1)))), 5)))"),
+        (
+            "cumulative_flow",
+            "CsZScore(CsRank(Delta(CumSum(Mul($volume, Sign(Delta($close, 1)))), 5)))",
+        ),
         ("range_breakout", "CsRank(Div(Sub($close, TsMin($low, 10)), Std($close, 10)))"),
         ("hull_deviation", "Neg(CsRank(Div(Sub($close, HMA($close, 20)), $close)))"),
-        ("conditional_vol", "CsZScore(IfElse(Greater($returns, 0), Std($returns, 10), Neg(Std($returns, 10))))"),
+        (
+            "conditional_vol",
+            "CsZScore(IfElse(Greater($returns, 0), Std($returns, 10), Neg(Std($returns, 10))))",
+        ),
         ("dema_crossover", "CsRank(Sub(DEMA($close, 5), DEMA($close, 20)))"),
         ("ts_rank_volume", "Neg(CsRank(TsRank($volume, 20)))"),
         ("median_price", "CsZScore(Div(Sub($close, Median($close, 20)), Median($close, 20)))"),
@@ -709,10 +721,7 @@ class MockProvider(LLMProvider):
 
         start = self._call_count * batch_size
         if self._cycle:
-            indices = [
-                (start + i) % len(self.MOCK_FACTORS)
-                for i in range(batch_size)
-            ]
+            indices = [(start + i) % len(self.MOCK_FACTORS) for i in range(batch_size)]
         else:
             indices = list(range(min(batch_size, len(self.MOCK_FACTORS))))
 
@@ -794,8 +803,7 @@ def _build_single_provider(config: dict[str, Any]) -> LLMProvider:
     cls = _PROVIDER_MAP.get(provider_name)
     if cls is None:
         raise ValueError(
-            f"Unknown LLM provider '{provider_name}'. "
-            f"Available: {sorted(_PROVIDER_MAP.keys())}"
+            f"Unknown LLM provider '{provider_name}'. Available: {sorted(_PROVIDER_MAP.keys())}"
         )
 
     prompt_cache = bool(config.get("prompt_cache", True))
@@ -808,9 +816,17 @@ def _build_single_provider(config: dict[str, Any]) -> LLMProvider:
     if "model" in config:
         kwargs["model"] = config["model"]
 
+    # logger.warning(f"LLM config is {config}")
+
     if provider_name in ("openai_compatible", "local"):
         # SECURITY (SSRF): base_url exclusively from local config dict.
-        base_url = config.get("base_url") or config.get("draft_base_url")
+        b_url = config.get("base_url")
+        db_url = config.get("draft_base_url")
+        base_url = None
+        if b_url is not None:
+            base_url = b_url
+        if db_url is not None:
+            base_url = db_url
         if not base_url:
             raise ValueError(
                 "openai_compatible/local provider requires llm.base_url "
@@ -886,12 +902,12 @@ def create_provider(config: dict[str, Any]) -> LLMProvider:
     if cascade_enabled:
         # Frontier = the configured primary provider, without cascade recursion.
         frontier_cfg = {
-            k: v
-            for k, v in config.items()
-            if k not in ("cascade", "cascade_enabled")
+            k: v for k, v in cascade_cfg.items() if k not in ("cascade", "cascade_enabled")
         }
         # Strip local-only keys that must not leak onto the frontier client.
         frontier_cfg.pop("base_url", None)
+
+        # logger.info(f"frontier_cfg {frontier_cfg}")
         frontier = _build_single_provider(frontier_cfg)
 
         draft_provider = cascade_cfg.get("draft_provider", "openai_compatible")

@@ -12,17 +12,17 @@
 # Data paths
 # ---------------------------------------------------------------------------
 # Path to market data CSV/Parquet/HDF5 file. Set to null to use mock data.
-data_path: /data/fuyao_data/hithink-finance/1000_panel_f.parquet
+data_path: /data/fuyao_data/hithink-finance/500_panel_f.parquet
 
 # Directory for all output artifacts (libraries, plots, logs).
-output_dir: "/data/fuyao_data/factorminer/output"
+output_dir: "/data/fuyao_data/factorminer/output3"
 
 # ---------------------------------------------------------------------------
 # Mining parameters (Ralph Loop)
 # ---------------------------------------------------------------------------
 mining:
   # Target number of factors in the final library (paper: 110)
-  target_library_size: 110
+  target_library_size: 40
 
   # Number of candidate factors to generate per iteration (paper: 40)
   batch_size: 40
@@ -31,16 +31,16 @@ mining:
   max_iterations: 200
 
   # Minimum absolute IC for a factor to pass Stage 1 screening (paper: 0.04)
-  ic_threshold: 0.04
+  ic_threshold: 0.010
 
   # Minimum ICIR for factor quality filtering
-  icir_threshold: 0.5
+  icir_threshold: 0.08
 
   # Maximum pairwise |rho| allowed between library factors (paper: 0.5)
-  correlation_threshold: 0.5
+  correlation_threshold: 0.6
 
   # Minimum IC required for a candidate to replace an existing factor
-  replacement_ic_min: 0.10
+  replacement_ic_min: 0.02
 
   # Replacement IC ratio: candidate IC must be >= ratio * existing IC
   replacement_ic_ratio: 1.3
@@ -50,10 +50,10 @@ mining:
 # ---------------------------------------------------------------------------
 evaluation:
   # Number of parallel workers for factor evaluation
-  num_workers: 40
+  num_workers: 4
 
   # Number of assets used in fast IC screening (Stage 1)
-  fast_screen_assets: 100
+  fast_screen_assets: 500
 
   # GPU device identifier (used when backend is "gpu")
   gpu_device: "cuda:0"
@@ -67,7 +67,7 @@ evaluation:
   # dominate RSS (one panel is M*T*8 bytes): switch to "float32" to halve the
   # benchmark footprint with no material change to IC/ICIR at reporting precision.
   # Recommended "float32" for CSI1000 on a 16 GB box.
-  signal_dtype: "float64"
+  signal_dtype: "float32"
 
   # Redundancy/dependence metric used for admission, replacement,
   # and library geometry diagnostics.
@@ -114,7 +114,9 @@ data:
     - name: "research"
       entry_delay_bars: 1
       holding_bars: 1
-      price_pair: "open_to_close"
+      # price_pair: "open_to_close"
+      # close→close
+      price_pair: "close_to_close"
       return_transform: "simple"
 
   # Target used for paper-style scalar evaluation surfaces.
@@ -126,21 +128,21 @@ data:
 llm:
   # Provider name: "openai", "anthropic", "google", "openai_compatible",
   # "local", or "mock"
-  provider: "google"
+  provider: openai_compatible
 
   # Model identifier (provider-specific)
   # OpenAI:    "gpt-4o", "gpt-4", etc.
   # Anthropic: "claude-sonnet-4-6", "claude-opus-4-6", etc.
   # Google:    "gemini-2.0-flash", etc.
   # Local:     Ollama/vLLM/SGLang model name
-  model: "gemini-2.0-flash"
+  model: Qwen/Qwen3-8B
 
   # API key for the chosen provider.
   # Can also be set via environment variables:
   #   OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY
   # NEVER set a frontier API key when provider is openai_compatible/local —
   # local engines use cascade.draft_api_key / local_api_key instead.
-  api_key: null
+  api_key: sk-izbswyhyxjuljsrfgxhgupsptetmttyllkxpbzkmqabaoocv
 
   # Sampling temperature for factor generation (higher = more creative)
   temperature: 0.8
@@ -162,29 +164,31 @@ llm:
   # Optional OpenAI-compatible base_url (local YAML only — SSRF-sensitive;
   # never accept from remote/untrusted input). Prefer cascade.draft_base_url
   # for local draft engines so frontier keys are not forwarded.
-  base_url: null
+  base_url: https://api.siliconflow.cn/v1
 
   # Cheap-first cascade: local draft -> deterministic DSL parse signal ->
   # frontier escalate only on parse failure. Default OFF.
   # Viable because FactorMiner has a deterministic expression parser — a free
   # routing signal most generic agentic-cost papers do not have.
-  cascade_enabled: false
-  cascade_draft_provider: "openai_compatible"
-  cascade_draft_model: "llama3.2"
-  # SECURITY (SSRF): draft_base_url from local config only.
-  cascade_draft_base_url: "http://127.0.0.1:11434/v1"
-  cascade_timeout_s: 60.0
-  cascade_escalate_on_parse_failure: true
+
+  # cascade_enabled: false
+  # cascade_draft_provider: "openai_compatible"
+  # cascade_draft_model: "agnes-3.0-flash"
+  # cascade_api_key: ssss
+  # # SECURITY (SSRF): draft_base_url from local config only.
+  # cascade_draft_base_url: "https://apihub.agnes-ai.com/v1"
+  # cascade_timeout_s: 60.0
+  # cascade_escalate_on_parse_failure: true
 
   # Nested cascade block (optional alternative to the flat cascade_* keys).
-  # cascade:
-  #   enabled: false
-  #   draft_provider: openai_compatible
-  #   draft_model: llama3.2
-  #   draft_base_url: "http://127.0.0.1:11434/v1"
-  #   draft_api_key: local
-  #   timeout_s: 60.0
-  #   escalate_on_parse_failure: true
+  cascade:
+    enabled: true
+    draft_provider: openai_compatible
+    draft_model: agnes-3.0-flash
+    draft_base_url: https://apihub.agnes-ai.com/v1
+    draft_api_key: sk-TL9870nIAcRRuKjUhuHPdgawKWjTr6H6VZSqtvPOuTXKe8Xc
+    timeout_s: 60.0
+    escalate_on_parse_failure: true
 
 # ---------------------------------------------------------------------------
 # Experience memory system
@@ -214,13 +218,13 @@ memory:
 # ---------------------------------------------------------------------------
 benchmark:
   # Execution lane: "paper" for strict reproduction, "research" for Helix extensions
-  mode: "research"
+  mode: "paper"
 
   # Global RNG seed for deterministic benchmark selection and synthesis
   seed: 42
 
   # Number of frozen factors selected on the freeze universe/train split
-  freeze_top_k: 300
+  freeze_top_k: 40
 
   # Universe used for Top-K freeze selection
   freeze_universe: "CSI500"
@@ -268,7 +272,7 @@ benchmark:
 # Research-first multi-horizon scoring
 # ---------------------------------------------------------------------------
 research:
-  enabled: true
+  enabled: false
   # Maximum persisted research hypotheses injected into any generation batch.
   knowledge_retrieval_limit: 4
 
@@ -297,7 +301,7 @@ research:
     redundancy_penalty: 0.20
     min_score: 0.04
     min_lcb: 0.0
-    min_residual_ic: 0.02
+    min_residual_ic: 0.01
     min_span_gain: 0.05
     min_effective_rank_gain: 0.0
     min_log_det_gain: -0.10
@@ -329,7 +333,7 @@ phase2:
     granger_significance: 0.05
     n_interventions: 3
     intervention_magnitude: 2.0
-    intervention_ic_threshold: 0.5
+    intervention_ic_threshold: 0.2
     robustness_threshold: 0.4
     granger_weight: 0.4
     intervention_weight: 0.6
@@ -341,15 +345,15 @@ phase2:
     bull_return_threshold: 0.0
     bear_return_threshold: 0.0
     volatility_percentile: 0.7
-    min_regime_ic: 0.03
+    min_regime_ic: 0.015
     min_regimes_passing: 2
 
   # Strategy capacity estimation
   capacity:
     enabled: true
     base_capital_usd: 100000000.0
-    ic_degradation_limit: 0.20
-    net_icir_threshold: 0.3
+    ic_degradation_limit: 0.015
+    net_icir_threshold: 0.12
     sigma_annual: 0.25
 
   # Statistical significance testing (bootstrap + FDR)

@@ -34,7 +34,7 @@ dependencies = [
     "networkx",
     "sympy",
     "fastparquet",
-    "xgboost",
+    "xgboost-cpu",
 ]
 
 [project.optional-dependencies]
@@ -58,7 +58,7 @@ research = [
 ]
 ml = [
     "torch>=2.0",
-    "xgboost>=2.0",
+    "xgboost-cpu>=2.0",
 ]
 visualization = [
     "matplotlib>=3.7",
@@ -73,6 +73,7 @@ dev = [
     "pytest-cov",
     "ruff",
     "mypy",
+    "basedpyright",
 ]
 all = [
     "cupy-cuda12x; platform_system == 'Linux'",
