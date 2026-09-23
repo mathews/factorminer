@@ -66,6 +66,7 @@ from factorminer.core.library_io import load_library, save_library
 from factorminer.core.loop_services import LoopExecutionService
 from factorminer.core.provenance import infer_parent_lineage, stable_digest
 from factorminer.core.session import MiningSession
+from factorminer.evaluation.dependence_index import indexed_dependence_metric
 from factorminer.memory.defaults import create_default_memory
 from factorminer.memory.memory_store import ExperienceMemory
 from factorminer.utils.logging import MiningSessionLogger
@@ -140,7 +141,7 @@ class RalphLoop:
         self.library = library or FactorLibrary(
             correlation_threshold=self.settings.correlation_threshold,
             ic_threshold=self.settings.ic_threshold,
-            dependence_metric=self.settings.redundancy_metric,
+            dependence_metric=indexed_dependence_metric(self.settings.redundancy_metric),
         )
         self.geometry = LibraryGeometry(self.library)
         self.admission_service = FactorAdmissionService(self.library)

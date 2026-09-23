@@ -124,6 +124,19 @@ Candidate/library correlation instead uses average tied ranks and ranks each
 column before masking paired observations. Dates with fewer than five paired
 ranks are skipped; constant ranks contribute zero on otherwise usable dates.
 
+Mining and benchmark libraries built with the `spearman` metric use
+`IndexedSpearmanMetric` (`evaluation/dependence_index.py`). It returns the same
+values as `SpearmanDependenceMetric`, bit for bit. Each signal is ranked once
+per period. A pair re-ranks only the periods where a signal's own NaN mask
+differs from the pair's joint mask. Chunking, memory layout, and reductions
+match the reference. Pair results are cached, so admission, replacement,
+diagnostics, and the library correlation matrix compute each pair only once.
+The index identifies signals by object identity and marks them read-only. It
+drops entries when arrays are garbage-collected and bounds prepared ranks to
+512 MiB (least recently used first). Run manifests report its hit counts under
+`runtime_profile.dependence_index`. Pearson and distance correlation are
+unchanged.
+
 ## Memory and research knowledge
 
 `MemoryPolicy` owns schema, retrieval, formation, evolution, serialization, and

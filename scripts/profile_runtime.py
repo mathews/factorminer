@@ -107,6 +107,13 @@ def build_catalog(candidates: int, seed: int) -> list[tuple[str, str]]:
     return [(entry.name, entry.formula) for entry in entries[:candidates]]
 
 
+def _dependence_metric(name: str, exact_index: bool) -> Any:
+    from factorminer.domain.dependence import build_dependence_metric
+    from factorminer.evaluation.dependence_index import indexed_dependence_metric
+
+    return indexed_dependence_metric(name) if exact_index else build_dependence_metric(name)
+
+
 def profile_mining(
     dataset: Any,
     cfg: Any,
@@ -114,6 +121,7 @@ def profile_mining(
     *,
     batch_size: int,
     profile: RuntimeProfile,
+    exact_index: bool = True,
 ) -> dict[str, Any]:
     """Run candidates through ``ValidationPipeline`` and admission in fixed batches."""
     from factorminer.application.validation_pipeline import ValidationPipeline
@@ -127,8 +135,9 @@ def profile_mining(
     library = FactorLibrary(
         correlation_threshold=cfg.mining.correlation_threshold,
         ic_threshold=cfg.mining.ic_threshold,
-        dependence_metric=cfg.evaluation.redundancy_metric,
+        dependence_metric=_dependence_metric(cfg.evaluation.redundancy_metric, exact_index),
     )
+    index = getattr(library.dependence_metric, "index", None)
     library.dependence_metric = CountingDependenceMetric(library.dependence_metric, profile)
     pipeline = ValidationPipeline(
         data_tensor=data_dict,
@@ -182,6 +191,10 @@ def profile_mining(
                 }
             )
             result.signals = None
+    if index is not None:
+        for name, value in index.stats().items():
+            if value is not None:
+                profile.count(f"dependence_index.{name}", value)
     library_ids = [factor.name for factor in library.list_factors()]
     return {"decisions": decisions, "library": library_ids, "growth": growth}
 
@@ -265,6 +278,7 @@ def run_profile(
     batch_size: int,
     trace_allocations: bool,
     signal_cache_mb: float | None = None,
+    exact_index: bool = True,
 ) -> dict[str, Any]:
     from factorminer.data.loader import load_market_data
     from factorminer.evaluation.runtime import load_runtime_dataset
@@ -278,7 +292,9 @@ def run_profile(
     del raw_df
     catalog = build_catalog(candidates, seed)
 
-    mining = profile_mining(dataset, cfg, catalog, batch_size=batch_size, profile=profile)
+    mining = profile_mining(
+        dataset, cfg, catalog, batch_size=batch_size, profile=profile, exact_index=exact_index
+    )
     benchmark = profile_benchmark(
         dataset, cfg, catalog, profile=profile, signal_cache_mb=signal_cache_mb
     )
@@ -308,6 +324,7 @@ def run_profile(
             "digest": _digest(catalog),
         },
         "signal_cache_mb": signal_cache_mb,
+        "dependence_index": exact_index,
         "runtime": profile.to_dict(),
         "library_growth": mining["growth"],
         "benchmark_library_stats": benchmark["library_stats"],
@@ -390,6 +407,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--trace-allocations", action="store_true")
     parser.add_argument("--signal-cache-mb", type=float, default=None,
                         help="Resident budget for retained benchmark signals (spills beyond it)")
+    parser.add_argument("--no-dependence-index", dest="exact_index", action="store_false",
+                        help="Use the unindexed reference Spearman metric in mining")
     parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--compare", type=Path, default=None,
                         help="Baseline profile; exit 1 unless exact results match")
@@ -406,6 +425,7 @@ def main(argv: list[str] | None = None) -> int:
         batch_size=args.batch_size,
         trace_allocations=args.trace_allocations,
         signal_cache_mb=args.signal_cache_mb,
+        exact_index=args.exact_index,
     )
     print("\n".join(_summary(result)))
     if args.output:

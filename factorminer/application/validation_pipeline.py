@@ -12,6 +12,7 @@ from factorminer.application.mining_budget import EvaluationResult
 from factorminer.architecture import EvaluationKernel, LibraryGeometry, PaperProtocol
 from factorminer.core.factor_library import FactorLibrary
 from factorminer.core.types import get_features
+from factorminer.evaluation.dependence_index import indexed_dependence_metric
 from factorminer.evaluation.metrics import compute_factor_stats
 from factorminer.evaluation.runtime import SignalComputationError, compute_tree_signals
 
@@ -60,7 +61,7 @@ class ValidationPipeline:
         self.library = library or FactorLibrary(
             correlation_threshold=0.5,
             ic_threshold=ic_threshold,
-            dependence_metric=redundancy_metric,
+            dependence_metric=indexed_dependence_metric(redundancy_metric),
         )
         self.ic_threshold = ic_threshold
         self.icir_threshold = icir_threshold
