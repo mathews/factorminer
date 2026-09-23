@@ -64,14 +64,27 @@ class PlanStep:
     inputs: tuple[int, ...]
     lookback: int | None
     cross_sectional: bool
-    node: Any
+    node: Any = None  # Only opaque nodes retain a mutable evaluator.
     operator: OperatorSpec | None = None
     params: tuple[tuple[str, float], ...] = ()
+    leaf_name: str = ""
+    constant: float = 0.0
 
     def run(self, data: Mapping[str, np.ndarray], inputs: list[np.ndarray]) -> np.ndarray:
         if self.kind == "operator":
             assert self.operator is not None
             return _dispatch_operator(self.operator, inputs, dict(self.params))
+        if self.kind == "leaf":
+            if self.leaf_name not in data:
+                raise KeyError(
+                    f"Feature '{self.leaf_name}' not found in data. "
+                    f"Available: {sorted(data.keys())}"
+                )
+            return data[self.leaf_name].astype(np.float64, copy=False)
+        if self.kind == "constant":
+            for panel in data.values():
+                return np.full_like(panel, self.constant, dtype=np.float64)
+            raise ValueError("Cannot evaluate ConstantNode with empty data dict.")
         result: np.ndarray = self.node.evaluate(data)
         return result
 
@@ -118,12 +131,16 @@ class _Compiler:
         if isinstance(node, LeafNode):
             return self._intern(
                 _hash("leaf", node.feature_name),
-                lambda digest: PlanStep(digest, "leaf", (), 0, False, node),
+                lambda digest: PlanStep(
+                    digest, "leaf", (), 0, False, leaf_name=node.feature_name
+                ),
             )
         if isinstance(node, ConstantNode):
             return self._intern(
                 _hash("constant", float(node.value).hex()),
-                lambda digest: PlanStep(digest, "constant", (), 0, False, node),
+                lambda digest: PlanStep(
+                    digest, "constant", (), 0, False, constant=float(node.value)
+                ),
             )
         if isinstance(node, OperatorNode):
             inputs = tuple(self.add(child) for child in node.children)
@@ -142,7 +159,7 @@ class _Compiler:
             return self._intern(
                 digest,
                 lambda digest: PlanStep(
-                    digest, "operator", inputs, lookback, cross_sectional, node,
+                    digest, "operator", inputs, lookback, cross_sectional,
                     operator=node.operator, params=params,
                 ),
             )
@@ -217,6 +234,7 @@ def _plan_from_steps(root: Any, steps: tuple[PlanStep, ...], output: int) -> Exp
         PlanStep(
             step.digest, step.kind, tuple(remap[i] for i in step.inputs), step.lookback,
             step.cross_sectional, step.node, step.operator, step.params,
+            step.leaf_name, step.constant,
         )
         for step in (steps[i] for i in ordered)
     )
@@ -226,7 +244,7 @@ def _plan_from_steps(root: Any, steps: tuple[PlanStep, ...], output: int) -> Exp
         steps=local,
         output=remap[output],
         required_features=frozenset(
-            step.node.feature_name for step in local if step.kind == "leaf"
+            step.leaf_name for step in local if step.kind == "leaf"
         ),
         max_lookback=out.lookback,
         cross_sectional=out.cross_sectional,

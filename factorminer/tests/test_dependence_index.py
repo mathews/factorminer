@@ -82,13 +82,26 @@ def test_index_cache_is_bounded_and_forgets_collected_arrays():
     assert index.stats()["cached_pairs"] == pairs_before - 1
 
 
-def test_indexed_signals_become_read_only():
+def test_prepared_rank_budget_is_strict_even_for_one_large_panel():
+    rng = np.random.default_rng(12)
+    a = _signals(rng, (20, 100), nan_rate=0.1, ties=False)
+    b = _signals(rng, (20, 100), nan_rate=0.1, ties=False)
+    index = DependenceIndex(max_prepared_bytes=100)
+    assert index.compute(a, b) == REFERENCE.compute(a, b)
+    assert index.stats()["prepared_bytes"] <= 100
+
+
+def test_indexed_signals_remain_writeable_and_mutations_invalidate_cache():
     rng = np.random.default_rng(1)
     a = _signals(rng, (6, 20), nan_rate=0.0, ties=False)
     b = _signals(rng, (6, 20), nan_rate=0.0, ties=False)
-    DependenceIndex().compute(a, b)
-    with pytest.raises(ValueError):
-        a[0, 0] = 1.0
+    index = DependenceIndex()
+    first = index.compute(a, b)
+    assert a.flags.writeable and b.flags.writeable
+    a[:, 0] = b[:, 0]
+    second = index.compute(a, b)
+    assert second == REFERENCE.compute(a, b)
+    assert second != first
 
 
 def test_indexed_metric_is_a_spearman_metric_and_survives_copying():

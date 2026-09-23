@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 import click
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from factorminer.cli.app import (
     _doctor_checks,

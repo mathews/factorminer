@@ -114,6 +114,33 @@ def test_duplicate_puts_share_storage_until_every_reference_is_released():
     assert store.resident_bytes == 0 and not store.has(_key("a"))
 
 
+def test_spill_files_are_private_to_store_and_split_names_are_safe(tmp_path):
+    sentinel = tmp_path / "keep.npy"
+    sentinel.write_bytes(b"keep")
+    store = SplitSignalStore(
+        selectors={"../outside": slice(0, 3)}, retain_splits=("../outside",),
+        dataset_digest="d", max_resident_bytes=0, spill_dir=tmp_path,
+    )
+    panel = np.arange(12.0).reshape(3, 4)
+    store.put(_key("a"), panel)
+    np.testing.assert_array_equal(store.get_split(_key("a"), "../outside"), panel[:, :3])
+    assert sentinel.read_bytes() == b"keep"
+    store.close()
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["keep.npy"]
+
+
+def test_invalid_put_does_not_leave_a_partial_signal():
+    store = SplitSignalStore(
+        selectors={"train": slice(0, 2), "bad": np.array([100])},
+        retain_splits=("train", "bad"), dataset_digest="d", max_resident_bytes=0,
+    )
+    with pytest.raises(IndexError):
+        store.put(_key("a"), np.ones((2, 3)))
+    assert not store.has(_key("a"))
+    assert store.stats()["resident_bytes"] == store.stats()["spilled_bytes"] == 0
+    store.close()
+
+
 def test_evaluate_factors_with_bounded_store_matches_in_memory_results():
     dataset = _dataset()
     factors = _factors()

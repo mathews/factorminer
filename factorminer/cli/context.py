@@ -7,7 +7,7 @@ import warnings
 from pathlib import Path
 
 import click
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from factorminer.configs import load_default_yaml
 from factorminer.utils.config import load_config

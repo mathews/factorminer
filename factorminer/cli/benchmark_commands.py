@@ -130,6 +130,37 @@ def table1(
     _print_summary("FactorMiner -- Benchmark Table 1", payload)
 
 
+@benchmark.command("evidence-run")
+@click.option("--baseline", "baselines", multiple=True, help="Restrict to baseline ids.")
+@click.option("--qlib-evidence", type=click.Path(exists=True, dir_okay=False), default=None,
+              help="JSON bundle describing Qlib handler, value export, and metrics.")
+@_common_options
+def evidence_run(
+    ctx: click.Context,
+    data_path: str | None,
+    mock: bool,
+    factor_miner_library: str | None,
+    factor_miner_no_memory_library: str | None,
+    baselines: tuple[str, ...],
+    qlib_evidence: str | None,
+) -> None:
+    """Run frozen baselines and publish a checked, portable research receipt."""
+    from factorminer.benchmark.evidence_run import run_evidence_benchmark
+
+    try:
+        payload = run_evidence_benchmark(
+            ctx.obj["config"], ctx.obj["output_dir"],
+            data_path=data_path, mock=mock,
+            baseline_names=list(baselines) if baselines else None,
+            qlib_evidence_path=qlib_evidence,
+            factor_miner_library_path=factor_miner_library,
+            factor_miner_no_memory_library_path=factor_miner_no_memory_library,
+        )
+    except (ValueError, FileNotFoundError, FileExistsError, RuntimeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(json.dumps(payload, indent=2))
+
+
 @benchmark.command("ablation-memory")
 @_common_options
 def ablation_memory(

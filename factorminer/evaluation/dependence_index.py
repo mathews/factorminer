@@ -12,14 +12,14 @@ bit, with two savings:
   made by admission, replacement, diagnostics, and the library correlation
   matrix are computed once.
 
-Arrays are identified by object identity and must not change while indexed.
-The index marks every signal it prepares read-only, so a later in-place write
-raises instead of silently invalidating a cached value. Entries are dropped
-when their arrays are garbage collected.
+Arrays are identified by object identity and a content fingerprint. A changed
+array invalidates its prepared ranks and pair results without changing caller
+write permissions. Entries are dropped when arrays are garbage collected.
 """
 
 from __future__ import annotations
 
+import hashlib
 import threading
 import weakref
 from collections import OrderedDict
@@ -49,9 +49,12 @@ class DependenceIndex:
     """Prepared-rank and pair-result caches for exact Spearman dependence."""
 
     def __init__(self, *, max_prepared_bytes: int | None = 512 * 1024 * 1024) -> None:
+        if max_prepared_bytes is not None and max_prepared_bytes < 0:
+            raise ValueError("max_prepared_bytes must be non-negative")
         self.max_prepared_bytes = max_prepared_bytes
         self._prepared: OrderedDict[int, _Prepared] = OrderedDict()
         self._refs: dict[int, weakref.ref[np.ndarray]] = {}
+        self._fingerprints: dict[int, bytes] = {}
         self._pairs: dict[tuple[int, int], float] = {}
         self._pairs_by_id: dict[int, set[tuple[int, int]]] = {}
         self._lock = threading.RLock()
@@ -68,13 +71,18 @@ class DependenceIndex:
 
     def _track(self, signals: np.ndarray) -> int:
         ident = id(signals)
+        contiguous = np.ascontiguousarray(signals)
+        digest = hashlib.blake2b(digest_size=16)
+        digest.update(str(signals.dtype).encode())
+        digest.update(str(signals.shape).encode())
+        digest.update(contiguous.view(np.uint8))
+        fingerprint = digest.digest()
         ref = self._refs.get(ident)
-        if ref is not None and ref() is signals:
+        if ref is not None and ref() is signals and self._fingerprints[ident] == fingerprint:
             return ident
-        if signals.flags.writeable:
-            signals.flags.writeable = False
         self._forget(ident)
         self._refs[ident] = weakref.ref(signals, self._collector(ident))
+        self._fingerprints[ident] = fingerprint
         return ident
 
     def _collector(self, ident: int) -> Any:
@@ -86,6 +94,7 @@ class DependenceIndex:
 
     def _forget(self, ident: int) -> None:
         self._refs.pop(ident, None)
+        self._fingerprints.pop(ident, None)
         prepared = self._prepared.pop(ident, None)
         if prepared is not None:
             self.prepared_bytes -= prepared.nbytes
@@ -113,7 +122,7 @@ class DependenceIndex:
         self._prepared[ident] = prepared
         self.prepared_bytes += prepared.nbytes
         if self.max_prepared_bytes is not None:
-            while len(self._prepared) > 1 and self.prepared_bytes > self.max_prepared_bytes:
+            while self._prepared and self.prepared_bytes > self.max_prepared_bytes:
                 _, evicted = self._prepared.popitem(last=False)
                 self.prepared_bytes -= evicted.nbytes
         return prepared

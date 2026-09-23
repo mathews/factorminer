@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from types import SimpleNamespace
 
 import numpy as np
@@ -75,8 +76,16 @@ def test_profile_script_records_exact_results_and_detects_changes():
     matches, lines = profile_runtime.compare_profiles(second, first)
     assert matches, lines
 
+    different_inputs = copy.deepcopy(first)
+    different_inputs["dataset"]["replay_digest"] = "changed"
+    matches, lines = profile_runtime.compare_profiles(second, different_inputs)
+    assert not matches and "not comparable" in lines[0]
+
+    old_schema = copy.deepcopy(first)
+    old_schema["schema_version"] = "factorminer-runtime-profile-v1"
+    assert not profile_runtime.compare_profiles(second, old_schema)[0]
+
     first["exact"]["mining"][0]["ic_paper_mean"] = -1.0
-    first["exact_digest"] = "changed"
     matches, lines = profile_runtime.compare_profiles(second, first)
     assert not matches
     assert any("mining: first difference at row 0" in line for line in lines)

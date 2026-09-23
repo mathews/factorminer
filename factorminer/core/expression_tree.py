@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
+from typing import cast
 
 import numpy as np
 
@@ -227,11 +228,11 @@ def _safe_div(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
 
 def _safe_log(x: np.ndarray) -> np.ndarray:
-    return np.sign(x) * np.log1p(np.abs(x))
+    return cast(np.ndarray, np.sign(x) * np.log1p(np.abs(x)))
 
 
 def _safe_sqrt(x: np.ndarray) -> np.ndarray:
-    return np.sign(x) * np.sqrt(np.abs(x))
+    return cast(np.ndarray, np.sign(x) * np.sqrt(np.abs(x)))
 
 
 def _rolling_apply(

@@ -23,7 +23,7 @@ from factorminer.core.expression_tree import (
     _dispatch_operator,
 )
 from factorminer.core.parser import parse, try_parse
-from factorminer.core.types import OPERATOR_REGISTRY, get_features
+from factorminer.core.types import OPERATOR_REGISTRY, SignatureType, get_features
 
 
 def _panel(assets: int = 12, periods: int = 90, seed: int = 5) -> dict[str, np.ndarray]:
@@ -107,6 +107,19 @@ def test_batch_shares_subexpressions_and_isolates_outputs():
     np.testing.assert_array_equal(outputs[1], parse(formulas[1]).evaluate(data))
 
 
+def test_compiled_plan_snapshots_mutable_tree_fields():
+    data = _panel()
+    leaf = LeafNode("$close")
+    constant = ConstantNode(2.0)
+    root = OperatorNode(OPERATOR_REGISTRY["Add"], [leaf, constant])
+    plan = compile_tree(root)
+    expected = plan.evaluate(data)
+    leaf.feature_name = "$open"
+    constant.value = 7.0
+    np.testing.assert_array_equal(plan.evaluate(data), expected)
+    assert plan.required_features == frozenset({"$close"})
+
+
 def test_failures_propagate_only_to_dependent_formulas():
     data = _panel()
     data.pop("$volume")
@@ -151,6 +164,29 @@ def test_finite_lookback_reproduces_values_after_a_split_boundary():
         np.testing.assert_array_equal(tile[:, plan.max_lookback :], full[:, boundary:])
         checked += 1
     assert checked > 50
+
+
+def test_every_temporal_operator_has_a_safe_lookback():
+    data = _panel(periods=90)
+    boundary = 60
+    for spec in OPERATOR_REGISTRY.values():
+        if spec.signature not in (
+            SignatureType.TIME_SERIES_TO_TIME_SERIES, SignatureType.REDUCE_TIME
+        ):
+            continue
+        children = [LeafNode("$close") for _ in range(spec.arity)]
+        node = OperatorNode(spec, children, {"window": 5.0} if "window" in spec.param_names else {})
+        plan = compile_tree(node)
+        if spec.name in {"EMA", "DEMA", "KAMA", "CumSum", "CumProd", "CumMax", "CumMin"}:
+            assert plan.max_lookback is None, spec.name
+            continue
+        assert plan.max_lookback is not None, spec.name
+        start = boundary - plan.max_lookback
+        full = plan.evaluate(data)
+        tiled = plan.evaluate({name: panel[:, start:] for name, panel in data.items()})
+        np.testing.assert_array_equal(
+            tiled[:, plan.max_lookback:], full[:, boundary:], err_msg=spec.name
+        )
 
 
 def test_operators_never_mutate_their_inputs():
@@ -211,6 +247,35 @@ def test_kernel_batch_signals_match_single_formula_path(policy):
             continue
         assert error is None
         np.testing.assert_array_equal(signals, expected)
+
+
+def test_parallel_batch_evaluation_matches_single_worker():
+    from factorminer.application.validation_pipeline import ValidationPipeline
+
+    data = _panel(assets=30, periods=80)
+    returns = np.nan_to_num(data["$returns"])
+    candidates = [
+        (f"f{i}", formula) for i, formula in enumerate([
+            "CsRank(Mean($close, 5))", "Neg(CsRank(Mean($close, 5)))",
+            "CsRank(Mean($close, 5))", "Broken(", "Return($open, 3)",
+            "Neg(Return($open, 3))", "CsRank($volume)", "Mean($close, 10)",
+        ])
+    ]
+    def run(workers):
+        pipeline = ValidationPipeline(
+            data_tensor=data, returns=returns, fast_screen_assets=10,
+            num_workers=workers, ic_threshold=0.02,
+        )
+        return pipeline.evaluate_batch(candidates)
+
+    single, parallel = run(1), run(3)
+    for left, right in zip(single, parallel, strict=True):
+        assert (left.factor_name, left.formula, left.stage_passed, left.admitted,
+                left.rejection_reason) == (right.factor_name, right.formula,
+                                          right.stage_passed, right.admitted,
+                                          right.rejection_reason)
+        if left.signals is not None:
+            np.testing.assert_array_equal(left.signals, right.signals)
 
 
 def test_evaluate_factors_is_independent_of_plan_batch_size():

@@ -101,6 +101,20 @@ def test_guarded_provider_types_and_records_failures():
     assert described["failures"] == 1 and described["recent_failures"][0]["kind"] == "rate_limit"
 
 
+def test_guarded_provider_redacts_credential_from_failures():
+    from factorminer.agent.provider_config import ProviderCredential
+
+    credential = ProviderCredential(PRIMARY, "failing", "config", "secret-key")
+    guarded = GuardedProvider(
+        FailingProvider(RuntimeError("request used secret-key")),
+        role=PRIMARY, credential=credential,
+    )
+    with pytest.raises(ProviderCallError) as caught:
+        guarded.generate("s", "u")
+    assert "secret-key" not in str(caught.value)
+    assert "secret-key" not in json.dumps(guarded.describe())
+
+
 @pytest.mark.parametrize(
     "exc,kind",
     [
@@ -168,6 +182,10 @@ def test_worker_returns_rankings_and_contains_failures():
     hung = run_isolated_selection("demo", signals, returns, target=f"{TARGETS}:hang",
                                   timeout_s=2)
     assert hung.status == "timeout"
+
+    malformed = run_isolated_selection("demo", signals, returns,
+                                       target=f"{TARGETS}:nonfinite")
+    assert malformed.status == "error" and "non-finite" in malformed.cause
 
 
 def test_unavailable_selection_is_never_reported_as_a_score():

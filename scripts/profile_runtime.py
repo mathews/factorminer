@@ -4,8 +4,9 @@
 The profile records wall time, peak RSS, signal panel allocations, dependence
 evaluations, and rejection outcomes per stage, together with the exact metrics
 and admission decisions produced. Two profiles are comparable when their
-``dataset`` and ``catalog`` digests match; ``--compare`` then requires the
-exact metrics to be identical and reports timing and memory ratios.
+schema, raw data, processed-panel replay identity, config, and catalog match;
+``--compare`` then requires exact metrics and decisions to be identical and
+reports timing and memory ratios.
 
 Examples::
 
@@ -34,7 +35,7 @@ if str(ROOT) not in sys.path:
 
 from factorminer.application.runtime_profile import RuntimeProfile  # noqa: E402
 
-PROFILE_SCHEMA = "factorminer-runtime-profile-v1"
+PROFILE_SCHEMA = "factorminer-runtime-profile-v2"
 DEFAULT_DATA = ROOT / "data" / "binance_crypto_5m.csv"
 DEFAULT_CONFIG = ROOT / "factorminer" / "configs" / "binance_sample.yaml"
 
@@ -280,6 +281,7 @@ def run_profile(
     signal_cache_mb: float | None = None,
     exact_index: bool = True,
 ) -> dict[str, Any]:
+    from factorminer.architecture.dataset_contract import DatasetContract
     from factorminer.data.loader import load_market_data
     from factorminer.evaluation.runtime import load_runtime_dataset
     from factorminer.utils.config import load_config
@@ -312,6 +314,10 @@ def run_profile(
             "path": str(data_path),
             "sha256": _file_sha256(data_path),
             "config": str(config_path) if config_path else None,
+            "config_sha256": _file_sha256(config_path) if config_path else None,
+            "replay_digest": _digest(
+                DatasetContract.from_runtime_dataset(cfg, dataset).replay_identity()
+            ),
             "assets": int(dataset.returns.shape[0]),
             "periods": int(dataset.returns.shape[1]),
             "features": list(dataset.data_dict),
@@ -337,12 +343,21 @@ def compare_profiles(current: dict[str, Any], baseline: dict[str, Any]) -> tuple
     """Return whether exact results match and a human-readable comparison."""
     lines: list[str] = []
     comparable = (
-        current["dataset"]["sha256"] == baseline["dataset"]["sha256"]
+        current.get("schema_version") == baseline.get("schema_version") == PROFILE_SCHEMA
+        and all(
+            current["dataset"].get(field) == baseline["dataset"].get(field)
+            and current["dataset"].get(field) is not None
+            for field in ("sha256", "replay_digest")
+        )
+        and current["dataset"].get("config_sha256") == baseline["dataset"].get("config_sha256")
         and current["catalog"]["digest"] == baseline["catalog"]["digest"]
     )
     if not comparable:
-        return False, ["Profiles use different datasets or catalogs; not comparable."]
-    matches = current["exact_digest"] == baseline["exact_digest"]
+        return False, ["Profiles use different schemas, data, preprocessing, or catalogs; not comparable."]
+    matches = (
+        current["exact_digest"] == baseline["exact_digest"]
+        and current["exact"] == baseline["exact"]
+    )
     lines.append(
         f"exact results: {'identical' if matches else 'DIFFERENT'} "
         f"(baseline commit {baseline['git']['commit'][:12]})"

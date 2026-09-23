@@ -21,3 +21,7 @@ def abort(factor_signals, returns):
 def hang(factor_signals, returns):
     time.sleep(60)
     return []
+
+
+def nonfinite(factor_signals, returns):
+    return [(next(iter(factor_signals)), float("nan"))]

@@ -10,7 +10,6 @@ budget rather than by the number of candidates.
 from __future__ import annotations
 
 import hashlib
-import shutil
 import tempfile
 import threading
 from collections import OrderedDict
@@ -108,7 +107,7 @@ class SplitSignalStore:
         self.dataset_digest = dataset_digest
         self.dtype = np.dtype(dtype)
         self.max_resident_bytes = max_resident_bytes
-        self._spill_root = Path(spill_dir) if spill_dir is not None else None
+        self._spill_parent = Path(spill_dir) if spill_dir is not None else None
         self._owned_spill: tempfile.TemporaryDirectory[str] | None = None
         self._resident: OrderedDict[tuple[str, str], np.ndarray] = OrderedDict()
         self._spilled: dict[tuple[str, str], Path] = {}
@@ -146,19 +145,27 @@ class SplitSignalStore:
     # ------------------------------------------------------------------
 
     def put(self, key: SignalKey, panel: np.ndarray) -> None:
+        if key.dataset_digest != self.dataset_digest or np.dtype(key.dtype) != self.dtype:
+            raise ValueError("signal key dataset or dtype does not match this store")
+        if panel.ndim != 2:
+            raise ValueError("signal panel must have shape (assets, periods)")
         token = key.token
         with self._lock:
             if token in self._refs:
                 self._refs[token] += 1
                 return
+            try:
+                for split in self.retain_splits:
+                    stored = np.array(panel[:, self.selectors[split]], dtype=self.dtype, order="C")
+                    stored.flags.writeable = False
+                    self._resident[(token, split)] = stored
+                    self.resident_bytes += stored.nbytes
+                    self.peak_resident_bytes = max(self.peak_resident_bytes, self.resident_bytes)
+                    self._enforce_budget()
+            except Exception:
+                self._remove(token)
+                raise
             self._refs[token] = 1
-            for split in self.retain_splits:
-                stored = np.array(panel[:, self.selectors[split]], dtype=self.dtype, order="C")
-                stored.flags.writeable = False
-                self._resident[(token, split)] = stored
-                self.resident_bytes += stored.nbytes
-            self.peak_resident_bytes = max(self.peak_resident_bytes, self.resident_bytes)
-            self._enforce_budget()
 
     def get_split(self, key: SignalKey, split: str) -> np.ndarray:
         entry = (key.token, split)
@@ -172,8 +179,8 @@ class SplitSignalStore:
             if path is None:
                 raise SignalUnavailableError(f"No stored {split!r} signals for {key.formula_digest[:12]}")
             self.spill_reads += 1
-        mapped: np.ndarray = np.load(path, mmap_mode="r")
-        return mapped
+            mapped: np.ndarray = np.load(path, mmap_mode="r")
+            return mapped
 
     def release(self, key: SignalKey) -> None:
         token = key.token
@@ -182,15 +189,19 @@ class SplitSignalStore:
             if count > 1:
                 self._refs[token] = count - 1
                 return
-            self._refs.pop(token, None)
-            for split in self.retain_splits:
-                panel = self._resident.pop((token, split), None)
-                if panel is not None:
-                    self.resident_bytes -= panel.nbytes
-                path = self._spilled.pop((token, split), None)
-                if path is not None:
-                    self.spilled_bytes -= path.stat().st_size
-                    path.unlink(missing_ok=True)
+            self._remove(token)
+
+    def _remove(self, token: str) -> None:
+        """Drop one formula while the store lock is held."""
+        self._refs.pop(token, None)
+        for split in self.retain_splits:
+            panel = self._resident.pop((token, split), None)
+            if panel is not None:
+                self.resident_bytes -= panel.nbytes
+            path = self._spilled.pop((token, split), None)
+            if path is not None:
+                self.spilled_bytes -= path.stat().st_size if path.exists() else 0
+                path.unlink(missing_ok=True)
 
     def has(self, key: SignalKey) -> bool:
         with self._lock:
@@ -199,19 +210,27 @@ class SplitSignalStore:
     # ------------------------------------------------------------------
 
     def _spill_dir(self) -> Path:
-        if self._spill_root is None:
-            self._owned_spill = tempfile.TemporaryDirectory(prefix="factorminer-signals-")
-            self._spill_root = Path(self._owned_spill.name)
-        self._spill_root.mkdir(parents=True, exist_ok=True)
-        return self._spill_root
+        if self._owned_spill is None:
+            if self._spill_parent is not None:
+                self._spill_parent.mkdir(parents=True, exist_ok=True)
+            self._owned_spill = tempfile.TemporaryDirectory(
+                prefix="factorminer-signals-", dir=self._spill_parent
+            )
+        return Path(self._owned_spill.name)
 
     def _enforce_budget(self) -> None:
         if self.max_resident_bytes is None:
             return
         while self._resident and self.resident_bytes > self.max_resident_bytes:
-            (token, split), panel = self._resident.popitem(last=False)
-            path = self._spill_dir() / f"{token}.{split}.npy"
-            np.save(path, panel)
+            (token, split), panel = next(iter(self._resident.items()))
+            split_token = hashlib.sha256(split.encode()).hexdigest()[:16]
+            path = self._spill_dir() / f"{token}.{split_token}.npy"
+            try:
+                np.save(path, panel)
+            except Exception:
+                path.unlink(missing_ok=True)
+                raise
+            self._resident.pop((token, split))
             self._spilled[(token, split)] = path
             self.resident_bytes -= panel.nbytes
             self.spilled_bytes += path.stat().st_size
@@ -243,15 +262,9 @@ class SplitSignalStore:
         if self._owned_spill is not None:
             self._owned_spill.cleanup()
             self._owned_spill = None
-            self._spill_root = None
 
     def __enter__(self) -> SplitSignalStore:
         return self
 
     def __exit__(self, *exc: object) -> None:
         self.close()
-
-    def __del__(self) -> None:  # pragma: no cover - best-effort cleanup
-        owned = getattr(self, "_owned_spill", None)
-        if owned is not None:
-            shutil.rmtree(owned.name, ignore_errors=True)

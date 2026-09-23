@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from concurrent.futures import as_completed
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import numpy as np
@@ -342,79 +342,36 @@ class ValidationPipeline:
         Stage 1-2.5 are run per-candidate (optionally in parallel).
         Stage 3 (dedup) runs on all admitted candidates together.
         """
-        signals = self._batch_signals([formula for _, formula in candidates])
+        if not candidates:
+            return []
+        data_dict = self._build_data_dict()
+        workers = min(max(self.num_workers, 1), len(candidates))
+        size = -(-len(candidates) // workers)
+        chunks = [candidates[start : start + size] for start in range(0, len(candidates), size)]
 
-        # Stage 1 + 2 + 2.5: per-candidate evaluation
-        if self.num_workers > 1:
-            results = self._evaluate_parallel(candidates, signals)
-        else:
-            results = [
-                self.evaluate_candidate(name, formula, precomputed=precomputed)
-                for (name, formula), precomputed in zip(candidates, signals, strict=True)
+        def evaluate_chunk(chunk: list[tuple[str, str]]) -> list[EvaluationResult]:
+            formulas = [formula for _, formula in chunk]
+            outcomes = self.kernel.iter_batch_signals(
+                formulas=formulas,
+                data_dict=data_dict,
+                returns_shape=self.returns.shape,
+                signal_failure_policy=self.signal_failure_policy,
+            )
+            return [
+                self.evaluate_candidate(name, formula, precomputed=(signals, error))
+                for (name, formula), (_tree, signals, error) in zip(chunk, outcomes, strict=True)
             ]
+
+        if workers == 1:
+            results = evaluate_chunk(chunks[0])
+        else:
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                results = [result for chunk in pool.map(evaluate_chunk, chunks) for result in chunk]
 
         # Stage 3: Intra-batch deduplication
         results = self._deduplicate_batch(results)
 
         return results
-
-    def _batch_signals(
-        self, formulas: list[str]
-    ) -> list[tuple[np.ndarray | None, Exception | None]]:
-        """Compute candidate signals through shared compiled plans.
-
-        Each worker evaluates one contiguous chunk as a single plan, so repeated
-        subexpressions within a chunk are evaluated once.
-        """
-        from concurrent.futures import ThreadPoolExecutor
-
-        data_dict = self._build_data_dict()
-
-        def compute(chunk: list[str]) -> list[tuple[np.ndarray | None, Exception | None]]:
-            return [
-                (signals, error)
-                for _tree, signals, error in self.kernel.compute_batch_signals(
-                    formulas=chunk,
-                    data_dict=data_dict,
-                    returns_shape=self.returns.shape,
-                    signal_failure_policy=self.signal_failure_policy,
-                )
-            ]
-
-        workers = min(max(self.num_workers, 1), len(formulas))
-        if workers <= 1:
-            return compute(formulas)
-        size = -(-len(formulas) // workers)
-        chunks = [formulas[start : start + size] for start in range(0, len(formulas), size)]
-        with ThreadPoolExecutor(max_workers=workers) as pool:
-            return [item for chunk in pool.map(compute, chunks) for item in chunk]
-
-    def _evaluate_parallel(
-        self,
-        candidates: list[tuple[str, str]],
-        signals: list[tuple[np.ndarray | None, Exception | None]],
-    ) -> list[EvaluationResult]:
-        """Evaluate candidates using a thread pool.
-
-        Note: uses threads rather than processes because signals arrays
-        are large and sharing via processes would require serialization.
-        """
-        from concurrent.futures import ThreadPoolExecutor
-
-        results: list[EvaluationResult | None] = [None] * len(candidates)
-
-        def _eval(idx: int, name: str, formula: str) -> tuple[int, EvaluationResult]:
-            return idx, self.evaluate_candidate(name, formula, precomputed=signals[idx])
-
-        with ThreadPoolExecutor(max_workers=self.num_workers) as pool:
-            futures = [
-                pool.submit(_eval, i, name, formula) for i, (name, formula) in enumerate(candidates)
-            ]
-            for future in as_completed(futures):
-                idx, result = future.result()
-                results[idx] = result
-
-        return [r for r in results if r is not None]
 
     def _deduplicate_batch(self, results: list[EvaluationResult]) -> list[EvaluationResult]:
         """Stage 3: Remove intra-batch duplicates among admitted candidates.

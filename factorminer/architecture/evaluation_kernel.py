@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -94,21 +94,34 @@ class EvaluationKernel:
         ``error`` is what :meth:`compute_signals` would raise for that formula.
         Subexpressions shared by the batch are evaluated once.
         """
+        return list(self.iter_batch_signals(
+            formulas=formulas, data_dict=data_dict, returns_shape=returns_shape,
+            signal_failure_policy=signal_failure_policy,
+        ))
+
+    def iter_batch_signals(
+        self,
+        *,
+        formulas: Sequence[str],
+        data_dict: dict[str, np.ndarray],
+        returns_shape: tuple[int, int],
+        signal_failure_policy: str | None = None,
+    ) -> Iterator[tuple[Any, np.ndarray | None, Exception | None]]:
+        """Yield formula outcomes in order without retaining every signal panel."""
         trees = [try_parse(formula) for formula in formulas]
-        outcomes: list[tuple[Any, np.ndarray | None, Exception | None]] = [
-            (None, None, SignalComputationError(f"Parse failure for '{formula}'"))
-            for formula in formulas
-        ]
-        parsed = [index for index, tree in enumerate(trees) if tree is not None]
-        for local_index, signals, error in compute_batch_signals(
-            [trees[index] for index in parsed],
+        parsed = [tree for tree in trees if tree is not None]
+        outcomes = iter(compute_batch_signals(
+            parsed,
             data_dict,
             returns_shape,
             signal_failure_policy=signal_failure_policy or self.protocol.signal_failure_policy,
-        ):
-            index = parsed[local_index]
-            outcomes[index] = (trees[index], signals, error)
-        return outcomes
+        ))
+        for formula, tree in zip(formulas, trees, strict=True):
+            if tree is None:
+                yield None, None, SignalComputationError(f"Parse failure for '{formula}'")
+            else:
+                _index, signals, error = next(outcomes)
+                yield tree, signals, error
 
     def compute_target_stats(
         self,

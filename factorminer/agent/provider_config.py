@@ -215,19 +215,35 @@ class GuardedProvider(LLMProvider):
                 cacheable_prefix=cacheable_prefix,
             )
         except ProviderCallError as exc:
-            self._record(exc)
-            raise
+            error = self._redact_error(exc)
+            self._record(error)
+            if error is exc:
+                raise
+            raise error from exc
         except Exception as exc:  # noqa: BLE001 - converted to a typed error
             error = ProviderCallError(
                 role=self.role,
                 provider=self.provider_name,
                 model=self.model,
                 kind=classify_provider_error(exc),
-                message=f"{type(exc).__name__}: {exc}",
+                message=self._redact(f"{type(exc).__name__}: {exc}"),
             )
             self._record(error)
             raise error from exc
         return text
+
+    def _redact(self, message: str) -> str:
+        key = self.credential.api_key if self.credential else ""
+        return message.replace(key, "[REDACTED]") if key and key != "local" else message
+
+    def _redact_error(self, error: ProviderCallError) -> ProviderCallError:
+        message = self._redact(error.message)
+        if message == error.message:
+            return error
+        return ProviderCallError(
+            role=error.role, provider=error.provider, model=error.model,
+            kind=error.kind, message=message,
+        )
 
     def __getattr__(self, name: str) -> Any:
         # Only reached for attributes the wrapper lacks (model settings,

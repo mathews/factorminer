@@ -98,10 +98,18 @@ def run_isolated_selection(
             )
         except subprocess.TimeoutExpired:
             return ModelOutcome(name, "timeout", cause=f"no result within {timeout_s:.0f}s")
+        except OSError as exc:
+            return ModelOutcome(name, "error", cause=f"worker could not start: {exc}")
 
         if completed.returncode == 0 and output.exists():
-            payload = json.loads(output.read_text())
-            ranking = [(int(fid), float(score)) for fid, score in payload["ranking"]]
+            try:
+                payload = json.loads(output.read_text())
+                ranking = [(int(fid), float(score)) for fid, score in payload["ranking"]]
+                if not all(np.isfinite(score) for _, score in ranking):
+                    raise ValueError("ranking contains a non-finite score")
+            except (OSError, ValueError, TypeError, KeyError) as exc:
+                return ModelOutcome(name, "error", cause=f"invalid worker result: {exc}",
+                                    exit_code=0)
             return ModelOutcome(name, "ok", ranking=ranking, exit_code=0)
 
         stderr = (completed.stderr or "").strip().splitlines()

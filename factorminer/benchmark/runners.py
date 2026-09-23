@@ -27,7 +27,7 @@ from contextlib import contextmanager
 from typing import Any
 
 import numpy as np
-import pandas as pd
+import pandas as pd  # type: ignore[import-untyped]
 
 import factorminer.core.helix_loop as helix_loop_module
 import factorminer.core.ralph_loop as ralph_loop_module

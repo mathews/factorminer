@@ -88,8 +88,8 @@ class ResearchActionService:
 
     def library_utility(self) -> float:
         threshold = self.loop.settings.ic_threshold
-        return sum(max(finite_float(f.ic_paper_mean) - threshold, 0)
-                   for f in self.loop.library.list_factors())
+        return float(sum(max(finite_float(f.ic_paper_mean) - threshold, 0)
+                         for f in self.loop.library.list_factors()))
 
     def prepare(self, payload: Any) -> str:
         records = self.ledger.records()
@@ -193,7 +193,7 @@ class ResearchActionService:
             "selection_probability": decision["selection_probability"],
             "rationale": decision["rationale"],
         }
-        return decision["chosen"]["kind"]
+        return str(decision["chosen"]["kind"])
 
     def _skill_context(self, parent: dict) -> dict:
         data_config = getattr(self.loop.config, "data", None)
@@ -226,6 +226,8 @@ class ResearchActionService:
 
     def _contact(self, name: str, formula: str, iteration: int, status: str,
                  ic_series: np.ndarray | None = None) -> None:
+        if self.active is None:
+            raise RuntimeError("Research action contact requires an active decision")
         self.loop.trial_ledger.record_data_contact(
             factor_name=name, formula=formula, dataset_id=self.loop.trial_dataset_id,
             target_name=self.loop.dataset_contract.default_target, iteration=iteration,

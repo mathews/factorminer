@@ -150,7 +150,8 @@ def test_qlib_comparison_requires_matching_rules_and_values():
     qlib, ours = _frames()
     columns = {"KMID": "kmid", "LABEL0": "target"}
     report = check_qlib_conformance(
-        spec, cfg, dataset_contract=contract, qlib_values=qlib, factorminer_values=ours,
+        spec, cfg, dataset_contract=contract, qlib_dataset_contract=contract,
+        qlib_values=qlib, factorminer_values=ours,
         columns=columns,
     )
     assert report.issues == []
@@ -167,17 +168,45 @@ def test_qlib_comparison_requires_matching_rules_and_values():
     with pytest.raises(NonConformantBaselineError, match="label"):
         require_conformance(mismatched)
 
-    no_values = check_qlib_conformance(spec, cfg, dataset_contract=contract)
+    no_values = check_qlib_conformance(
+        spec, cfg, dataset_contract=contract, qlib_dataset_contract=contract
+    )
     with pytest.raises(NonConformantBaselineError, match="no shared-panel value checks"):
         require_conformance(no_values)
 
     waived = check_qlib_conformance(
         QlibHandlerSpec.alpha360(instruments="Binance", freq="5min",
                                  learn_processors=["DropnaLabel"]),
-        cfg, dataset_contract=contract, qlib_values=qlib, factorminer_values=ours,
+        cfg, dataset_contract=contract, qlib_dataset_contract=contract,
+        qlib_values=qlib, factorminer_values=ours,
         columns=columns, accepted_differences=["infer_processors"],
     )
     assert waived.conformant and waived.to_dict()["accepted_differences"] == ["infer_processors"]
+
+    unknown_provider = check_qlib_conformance(
+        spec, cfg, dataset_contract=contract, qlib_values=qlib,
+        factorminer_values=ours, columns=columns,
+    )
+    assert not unknown_provider.conformant
+    assert {issue.field for issue in unknown_provider.blocking_issues} == {
+        "availability", "universe_policy", "adjustment_policy"
+    }
+
+    conflicting_policy = check_qlib_conformance(
+        spec, cfg, dataset_contract=contract,
+        qlib_dataset_contract={**contract, "universe_policy": "point_in_time"},
+        qlib_values=qlib, factorminer_values=ours, columns=columns,
+    )
+    assert not conflicting_policy.conformant
+    assert [issue.field for issue in conflicting_policy.blocking_issues] == ["universe_policy"]
+
+    invalid_policy = check_qlib_conformance(
+        spec, cfg, dataset_contract={**contract, "availability": "unknown"},
+        qlib_dataset_contract={**contract, "availability": "unknown"},
+        qlib_values=qlib, factorminer_values=ours, columns=columns,
+    )
+    assert not invalid_policy.conformant
+    assert [issue.field for issue in invalid_policy.blocking_issues] == ["availability"]
 
 
 def test_value_checks_report_nan_value_and_row_mismatches():
@@ -187,3 +216,20 @@ def test_value_checks_report_nan_value_and_row_mismatches():
     check = compare_values(qlib, ours.iloc[:-1], columns={"KMID": "kmid"})[0]
     assert (check.value_mismatches, check.nan_mismatches, check.missing_rows) == (1, 1, 1)
     assert check.max_abs_diff == 99.0 and not check.passed
+
+
+def test_qlib_value_checks_reject_duplicate_panel_rows():
+    qlib, ours = _frames()
+    duplicate = pd.concat([qlib, qlib.iloc[:1]])
+    with pytest.raises(ValueError, match="unique row keys"):
+        compare_values(duplicate, ours, columns={"KMID": "kmid"})
+
+
+def test_qlib_value_checks_reject_matching_infinities():
+    qlib, ours = _frames()
+    qlib.iloc[0, 0] = np.inf
+    ours.iloc[0, 0] = np.inf
+    check = compare_values(qlib, ours, columns={"KMID": "kmid"})[0]
+    assert check.value_mismatches == 1
+    assert np.isfinite(check.max_abs_diff)
+    assert not check.passed

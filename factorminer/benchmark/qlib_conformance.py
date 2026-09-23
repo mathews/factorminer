@@ -21,6 +21,11 @@ from typing import Any
 import numpy as np
 import pandas as pd  # type: ignore[import-untyped]
 
+from factorminer.architecture.dataset_contract import (
+    ADJUSTMENT_POLICIES,
+    AVAILABILITY_POLICIES,
+    UNIVERSE_POLICIES,
+)
 from factorminer.data.tensor_builder import TargetSpec, _resolve_target_offsets
 
 QLIB_DEFAULT_LABEL = "Ref($close, -2)/Ref($close, -1) - 1"
@@ -228,6 +233,7 @@ def compare_processing(
     cfg: Any,
     *,
     dataset_contract: Mapping[str, Any] | None = None,
+    qlib_dataset_contract: Mapping[str, Any] | None = None,
 ) -> list[ConformanceIssue]:
     """List workflow settings where FactorMiner and Qlib would process data differently."""
     issues: list[ConformanceIssue] = []
@@ -291,11 +297,27 @@ def compare_processing(
         ))
 
     contract = dict(dataset_contract or {})
-    for name in ("availability", "universe_policy", "adjustment_policy"):
-        if contract.get(name, "unspecified") == "unspecified":
+    qlib_contract = dict(qlib_dataset_contract or {})
+    policy_values = {
+        "availability": AVAILABILITY_POLICIES,
+        "universe_policy": UNIVERSE_POLICIES,
+        "adjustment_policy": ADJUSTMENT_POLICIES,
+    }
+    for name, allowed in policy_values.items():
+        ours = contract.get(name, "unspecified")
+        qlib = qlib_contract.get(name, "unspecified")
+        if ours not in allowed or qlib not in allowed:
             issues.append(ConformanceIssue(
-                name, "Qlib provider data", "unspecified",
-                f"declare data.{name} so both sides are known to use the same data rules",
+                name, qlib, ours, f"policy must be one of {sorted(allowed)}",
+            ))
+        elif ours == "unspecified" or qlib == "unspecified":
+            issues.append(ConformanceIssue(
+                name, qlib, ours,
+                f"declare {name} for both Qlib provider data and FactorMiner data",
+            ))
+        elif ours != qlib:
+            issues.append(ConformanceIssue(
+                name, qlib, ours, "provider data policies differ",
             ))
     return issues
 
@@ -314,6 +336,8 @@ def compare_values(
     names shared by both). Rows present on one side only are counted as
     missing; NaN positions must agree exactly.
     """
+    if not qlib_values.index.is_unique or not factorminer_values.index.is_unique:
+        raise ValueError("Qlib and FactorMiner value exports must have unique row keys")
     if columns is None:
         mapping = {name: name for name in qlib_values.columns if name in factorminer_values.columns}
     elif isinstance(columns, Mapping):
@@ -328,13 +352,14 @@ def compare_values(
         right = factorminer_values.loc[index, ours_column].to_numpy(dtype=np.float64)
         left_nan, right_nan = np.isnan(left), np.isnan(right)
         both = ~(left_nan | right_nan)
-        close = np.isclose(left[both], right[both], rtol=rtol, atol=atol)
-        diffs = np.abs(left[both] - right[both])
+        finite = np.isfinite(left[both]) & np.isfinite(right[both])
+        close = np.isclose(left[both][finite], right[both][finite], rtol=rtol, atol=atol)
+        diffs = np.abs(left[both][finite] - right[both][finite])
         checks.append(ValueCheck(
             column=f"{qlib_column}->{ours_column}",
-            compared=int(both.sum()),
+            compared=int(finite.sum()),
             nan_mismatches=int((left_nan != right_nan).sum()),
-            value_mismatches=int((~close).sum()),
+            value_mismatches=int((~close).sum() + (~finite).sum()),
             max_abs_diff=float(diffs.max()) if diffs.size else 0.0,
             missing_rows=missing,
         ))
@@ -346,6 +371,7 @@ def check_qlib_conformance(
     cfg: Any,
     *,
     dataset_contract: Mapping[str, Any] | None = None,
+    qlib_dataset_contract: Mapping[str, Any] | None = None,
     qlib_values: pd.DataFrame | None = None,
     factorminer_values: pd.DataFrame | None = None,
     columns: Mapping[str, str] | Sequence[str] | None = None,
@@ -360,7 +386,10 @@ def check_qlib_conformance(
     """
     report = ConformanceReport(
         handler=spec.to_dict(),
-        issues=compare_processing(spec, cfg, dataset_contract=dataset_contract),
+        issues=compare_processing(
+            spec, cfg, dataset_contract=dataset_contract,
+            qlib_dataset_contract=qlib_dataset_contract,
+        ),
         accepted=list(accepted_differences),
     )
     if qlib_values is not None and factorminer_values is not None:

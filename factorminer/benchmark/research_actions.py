@@ -13,12 +13,16 @@ import time
 from collections import Counter
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
 from factorminer.application.runtime_context import MiningRunContext
-from factorminer.architecture.research_actions import POLICIES, canonical_json
+from factorminer.architecture.research_actions import (
+    POLICIES,
+    ResearchActionPlanner,
+    canonical_json,
+)
 from factorminer.architecture.stages import GenerateStage
 from factorminer.core.ralph_loop import RalphLoop
 from factorminer.core.types import get_features
@@ -179,6 +183,9 @@ def compare_research_actions(
             run_dir = output / f"seed-{seed}" / policy
             loop = RalphLoop(cfg, data[:, :split - purge_bars], returns[:, :split - purge_bars],
                              checkpoint_interval=0, run_context=MiningRunContext(output_dir=run_dir))
+            actions = loop.research_actions
+            if actions is None:
+                raise RuntimeError("Research actions are required for this benchmark")
             cursor = 0
 
             def generate(_loop, payload):
@@ -189,20 +196,23 @@ def compare_research_actions(
                 return candidates
 
             loop.stages["generate"] = GenerateStage(generate)
-            loop.research_actions.planner = _EpisodePlanner(loop.research_actions.planner, loop, evaluation_horizon)
+            actions.planner = cast(
+                ResearchActionPlanner,
+                _EpisodePlanner(actions.planner, loop, evaluation_horizon),
+            )
             started = time.monotonic()
-            while loop.research_actions.ledger.summary()["evaluations"] < evaluation_horizon:
-                remaining = evaluation_horizon - loop.research_actions.ledger.summary()["evaluations"]
+            while actions.ledger.summary()["evaluations"] < evaluation_horizon:
+                remaining = evaluation_horizon - actions.ledger.summary()["evaluations"]
                 loop.iteration += 1
                 stats = loop._run_iteration(min(2, remaining))
                 if stats.get("research_stop"):
                     break
             elapsed = time.monotonic() - started
-            records = loop.research_actions.ledger.records()
+            records = actions.ledger.records()
             frozen = {"formulas": [f.formula for f in loop.library.list_factors()],
                       "actions": records, "config": cfg.to_dict()}
             (run_dir / "frozen_discovery.json").write_text(json.dumps(frozen, indent=2, allow_nan=False))
-            row = {"seed": seed, "policy": policy, "evaluations": loop.research_actions.ledger.summary()["evaluations"],
+            row = {"seed": seed, "policy": policy, "evaluations": actions.ledger.summary()["evaluations"],
                    "actions": dict(Counter(r["decision"]["chosen"]["kind"] for r in records)),
                    "elapsed_seconds": elapsed, "generated_candidates": cursor,
                    "planner_config": asdict(cfg.research.planner),
