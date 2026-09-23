@@ -48,11 +48,15 @@ class ValidationPipeline:
         benchmark_mode: str = "paper",
         redundancy_metric: str = "spearman",
         evaluation_kernel: EvaluationKernel | None = None,
+        default_target: str = "paper",
     ) -> None:
         self.data_tensor = data_tensor  # (M, T, F)
         self.returns = returns  # (M, T)
-        self.target_panels = target_panels or {"paper": returns}
-        self.target_horizons = target_horizons or {"paper": 1}
+        self.default_target = default_target
+        self.target_panels = target_panels or {default_target: returns}
+        if default_target not in self.target_panels:
+            raise ValueError(f"Default target {default_target!r} is missing from target_panels")
+        self.target_horizons = target_horizons or {default_target: 1}
         self.library = library or FactorLibrary(
             correlation_threshold=0.5,
             ic_threshold=ic_threshold,
@@ -79,7 +83,7 @@ class ValidationPipeline:
                 "replacement_ic_ratio": replacement_ic_ratio,
             },
         )()
-        protocol_cfg.data = type("DataCfg", (), {"default_target": "paper", "targets": []})()
+        protocol_cfg.data = type("DataCfg", (), {"default_target": default_target, "targets": []})()
         protocol_cfg.benchmark = type(
             "BenchCfg",
             (),
@@ -182,13 +186,13 @@ class ValidationPipeline:
             self.returns,
             self.target_panels,
         )
-        paper_stats = result.target_stats["paper"]
-        result.ic_mean = paper_stats["ic_mean"]
-        result.ic_paper_mean = paper_stats["ic_paper_mean"]
-        result.ic_abs_mean = paper_stats["ic_abs_mean"]
-        result.icir = paper_stats["icir"]
-        result.ic_paper_icir = paper_stats["ic_paper_icir"]
-        result.ic_win_rate = paper_stats["ic_win_rate"]
+        primary_stats = result.target_stats[self.default_target]
+        result.ic_mean = primary_stats["ic_mean"]
+        result.ic_paper_mean = primary_stats["ic_paper_mean"]
+        result.ic_abs_mean = primary_stats["ic_abs_mean"]
+        result.icir = primary_stats["icir"]
+        result.ic_paper_icir = primary_stats["ic_paper_icir"]
+        result.ic_win_rate = primary_stats["ic_win_rate"]
 
         quality = self.kernel.compute_quality_score(
             signals=signals,

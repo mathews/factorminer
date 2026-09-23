@@ -120,11 +120,12 @@ class Phase2ComponentFactory:
                     components.regime_classification = components.regime_detector.classify(
                         returns
                     )
-                    components.regime_evaluator = evaluator_cls(
-                        returns=returns,
-                        regime=components.regime_classification,
-                        config=regime_config,
-                    )
+                    if evaluator_cls is not None:
+                        components.regime_evaluator = evaluator_cls(
+                            returns=returns,
+                            regime=components.regime_classification,
+                            config=regime_config,
+                        )
                 except Exception as exc:
                     logger.warning("Helix: failed to initialize regime evaluator: %s", exc)
                     components.regime_evaluator = None

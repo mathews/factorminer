@@ -124,7 +124,7 @@ def compute_targets(
     target_specs: Sequence[TargetSpec],
 ) -> pd.DataFrame:
     """Compute one or more named forward-return targets on the same panel."""
-    df = df.sort_values(["asset_id", "datetime"]).copy()
+    df = df.sort_values(["asset_id", "datetime"])
 
     for spec in target_specs:
         start_col, end_col, start_offset, end_offset = _resolve_target_offsets(spec)
@@ -189,7 +189,7 @@ def _resolve_target_offsets(spec: TargetSpec) -> tuple[str, str, int, int]:
 def _to_backend(arr: np.ndarray, backend: Backend, dtype: str):
     """Convert a numpy array to the requested backend."""
     np_dtype = getattr(np, dtype, np.float32)
-    arr = arr.astype(np_dtype)
+    arr = np.asarray(arr, dtype=np_dtype)
 
     if backend == "numpy":
         return arr
@@ -230,18 +230,11 @@ def _build_3d(
     F = len(columns)
     tensor = np.full((M, T, F), np.nan, dtype=np.float64)
 
-    asset_map = {a: i for i, a in enumerate(asset_ids)}
-    time_map = {t: j for j, t in enumerate(timestamps)}
-
-    df_idx = df.copy()
-    df_idx["_ai"] = df_idx["asset_id"].map(asset_map)
-    df_idx["_ti"] = df_idx["datetime"].map(time_map)
-    df_idx = df_idx.dropna(subset=["_ai", "_ti"])
-    df_idx["_ai"] = df_idx["_ai"].astype(int)
-    df_idx["_ti"] = df_idx["_ti"].astype(int)
-
-    values = df_idx[list(columns)].to_numpy(dtype=np.float64)
-    tensor[df_idx["_ai"].values, df_idx["_ti"].values, :] = values
+    asset_index = pd.Index(asset_ids).get_indexer(df["asset_id"])
+    time_index = pd.Index(timestamps).get_indexer(df["datetime"])
+    valid = (asset_index >= 0) & (time_index >= 0)
+    values = df[list(columns)].to_numpy(dtype=np.float64, copy=False)
+    tensor[asset_index[valid], time_index[valid], :] = values[valid]
 
     return tensor
 

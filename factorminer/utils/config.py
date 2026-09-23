@@ -56,6 +56,7 @@ class EvaluationConfig:
     backend: str = "numpy"
     redundancy_metric: str = "spearman"
     signal_failure_policy: str = "reject"
+    signal_dtype: str = "float64"
 
     def validate(self) -> None:
         if self.num_workers < 1:
@@ -72,6 +73,8 @@ class EvaluationConfig:
             raise ValueError(
                 "signal_failure_policy must be one of: reject, synthetic, raise"
             )
+        if self.signal_dtype not in ("float32", "float64"):
+            raise ValueError("signal_dtype must be float32 or float64")
 
 
 @dataclass

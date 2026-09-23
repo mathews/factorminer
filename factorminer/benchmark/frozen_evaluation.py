@@ -195,6 +195,7 @@ def evaluate_frozen_set(
     n_trials: int = 1,
     include_capacity_evidence: bool = False,
     family_ic_series: dict[str, np.ndarray] | None = None,
+    signal_dtype: str = "float64",
 ) -> dict:
     """Evaluate one frozen factor set on one universe."""
     if cost_bps is None:
@@ -210,7 +211,13 @@ def evaluate_frozen_set(
         )
         for artifact in frozen
     )
-    artifacts = evaluate_factors(factors, dataset, signal_failure_policy="reject")
+    artifacts = evaluate_factors(
+        factors,
+        dataset,
+        signal_failure_policy="reject",
+        retain_splits=(fit_split, split_name),
+        signal_dtype=signal_dtype,
+    )
     succeeded = [artifact for artifact in artifacts if artifact.succeeded]
 
     result = {
@@ -239,6 +246,8 @@ def evaluate_frozen_set(
     }
     if not succeeded:
         result["warnings"].append("No frozen factors recomputed successfully on this universe")
+        for artifact in artifacts:
+            artifact.release_signals()
         return result
 
     result["library"] = {
@@ -424,4 +433,6 @@ def evaluate_frozen_set(
             ),
         }
 
+    for artifact in artifacts:
+        artifact.release_signals()
     return result

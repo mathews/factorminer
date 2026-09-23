@@ -83,12 +83,43 @@ class SpearmanDependenceMetric(DependenceMetric):
     name: str = "spearman"
 
     def compute(self, signals_a: np.ndarray, signals_b: np.ndarray) -> float:
-        scores: list[float] = []
-        for col_a, col_b in _iter_valid_columns(signals_a, signals_b):
-            scores.append(_pearson_abs(rankdata(col_a), rankdata(col_b)))
-        if not scores:
-            return 0.0
-        return float(np.mean(scores))
+        if signals_a.shape != signals_b.shape:
+            raise ValueError(f"Signal shapes must match: {signals_a.shape} vs {signals_b.shape}")
+        if signals_a.ndim != 2:
+            raise ValueError("Spearman signals must be two-dimensional")
+
+        # Rank each period on its *jointly* valid assets. Ranking either panel
+        # before applying the pair mask changes Spearman when NaN masks differ.
+        # Bounded chunks keep the temporary rank arrays small on long panels.
+        correlation_sum = 0.0
+        period_count = 0
+        for start in range(0, signals_a.shape[1], 256):
+            a = signals_a[:, start : start + 256]
+            b = signals_b[:, start : start + 256]
+            valid = ~(np.isnan(a) | np.isnan(b))
+            usable = valid.sum(axis=0) >= 3
+            if not np.any(usable):
+                continue
+            mask = valid[:, usable]
+            ranked_a = rankdata(np.where(mask, a[:, usable], np.nan), axis=0, nan_policy="omit")
+            ranked_b = rankdata(np.where(mask, b[:, usable], np.nan), axis=0, nan_policy="omit")
+            ranked_a -= np.nanmean(ranked_a, axis=0)
+            ranked_b -= np.nanmean(ranked_b, axis=0)
+            np.nan_to_num(ranked_a, copy=False, nan=0.0)
+            np.nan_to_num(ranked_b, copy=False, nan=0.0)
+            numerator = np.sum(ranked_a * ranked_b, axis=0)
+            denominator = np.sqrt(
+                np.sum(ranked_a**2, axis=0) * np.sum(ranked_b**2, axis=0)
+            )
+            correlations = np.divide(
+                np.abs(numerator),
+                denominator,
+                out=np.zeros_like(numerator),
+                where=denominator >= 1e-12,
+            )
+            correlation_sum += float(np.sum(correlations))
+            period_count += int(correlations.size)
+        return correlation_sum / period_count if period_count else 0.0
 
 
 @dataclass(frozen=True)

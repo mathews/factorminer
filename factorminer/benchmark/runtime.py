@@ -244,10 +244,15 @@ def run_table1_benchmark(
             )
             candidate_count = len(entries)
 
+        selection_split = (
+            "validation" if "validation" in getattr(freeze_dataset, "splits", {}) else "train"
+        )
         artifacts = evaluate_factors(
             factors,
             freeze_dataset,
             signal_failure_policy="reject",
+            retain_splits=("train", selection_split),
+            signal_dtype=getattr(cfg.evaluation, "signal_dtype", "float64"),
         )
 
         library_cfg = _cfg_with_overrides(cfg, cfg.benchmark.freeze_universe)
@@ -261,15 +266,16 @@ def run_table1_benchmark(
             ic_threshold=library_cfg.mining.ic_threshold,
             correlation_threshold=library_cfg.mining.correlation_threshold,
         )
-        selection_split = (
-            "validation" if "validation" in getattr(freeze_dataset, "splits", {}) else "train"
-        )
         frozen = select_frozen_top_k(
             artifacts,
             library,
             top_k=cfg.benchmark.freeze_top_k,
             split_name=selection_split,
         )
+        for artifact in artifacts:
+            artifact.release_signals()
+        for factor in library.list_factors():
+            factor.signals = None
 
         baseline_result = {
             "baseline": baseline,
@@ -351,6 +357,7 @@ def run_table1_benchmark(
                 n_trials=candidate_count,
                 include_capacity_evidence=bool(cfg.phase2.capacity.enabled),
                 family_ic_series=family_ic_series,
+                signal_dtype=getattr(cfg.evaluation, "signal_dtype", "float64"),
             )
 
         result_path = benchmark_dir / f"{baseline}.json"

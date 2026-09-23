@@ -100,6 +100,28 @@ measure the supplied implementation and panel. [Public evidence releases](public
 add checksum-locked data and portable verification; independent reproduction
 requires another run on the same declared inputs.
 
+## Runtime profiles
+
+```bash
+uv run python scripts/profile_runtime.py --output output/profile/base.json
+uv run python scripts/profile_runtime.py --data path/to/panel.parquet \
+  --config path/to/config.yaml --candidates 400 --compare output/profile/base.json
+```
+
+The profiler runs a fixed catalog (Alpha101-adapted plus seeded random
+formulas) through mining admission on the train split and through frozen
+benchmark evaluation. It records the commit, dirty flag, data SHA-256, panel
+shape, and the following for each stage: wall time, peak RSS, signal panel
+count and bytes, and candidate outcomes. It also records dependence
+evaluations and how the library grows with each batch. `--trace-allocations`
+adds tracemalloc peaks, which include NumPy buffers, at a speed cost.
+
+The exact admission decisions and split metrics are hashed. When the dataset
+and catalog digests match, `--compare` exits non-zero if those results differ
+from the baseline. Run it before and after each performance change. Mining
+runs store the same per-stage measurements under `runtime_profile` in
+`run_manifest.json`.
+
 ## Experiment-selection comparison
 
 ```bash

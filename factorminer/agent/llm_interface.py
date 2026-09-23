@@ -913,8 +913,12 @@ def create_provider(config: dict[str, Any]) -> LLMProvider:
             for k, v in config.items()
             if k not in ("cascade", "cascade_enabled")
         }
-        # Strip local-only keys that must not leak onto the frontier client.
-        frontier_cfg.pop("base_url", None)
+        # Hosted SDKs must not inherit a draft endpoint. An explicitly
+        # configured OpenAI-compatible primary still needs its own base URL.
+        if frontier_cfg.get("provider") not in ("openai_compatible", "local"):
+            frontier_cfg.pop("base_url", None)
+        frontier_cfg.pop("draft_base_url", None)
+        frontier_cfg.pop("draft_api_key", None)
         frontier = _build_single_provider(frontier_cfg)
 
         draft_provider = cascade_cfg.get("draft_provider", "openai_compatible")

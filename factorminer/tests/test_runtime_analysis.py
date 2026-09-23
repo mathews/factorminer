@@ -102,6 +102,35 @@ def test_evaluate_factors_matches_direct_metric_computation(small_data):
     )
 
 
+def test_evaluate_factors_releases_unneeded_panels_after_scoring(small_data):
+    dataset = _build_dataset(small_data)
+    factor = Factor(
+        id=1,
+        name="close",
+        formula="$close",
+        category="test",
+        ic_mean=0.0,
+        icir=0.0,
+        ic_win_rate=0.0,
+        max_correlation=0.0,
+        batch_number=0,
+    )
+    full = evaluate_factors([factor], dataset)[0]
+    retained = evaluate_factors(
+        [factor], dataset, retain_splits=("train",), signal_dtype="float32"
+    )[0]
+
+    assert np.shares_memory(full.signals_full, full.split_signals["train"])
+    assert retained.signals_full is None
+    assert set(retained.split_signals) == {"train"}
+    assert retained.split_signals["train"].dtype == np.float32
+    assert retained.split_stats["test"]["ic_mean"] == full.split_stats["test"]["ic_mean"]
+    assert retained.succeeded
+    retained.release_signals()
+    assert retained.succeeded
+    assert not retained.split_signals
+
+
 def test_compute_tree_signals_obeys_failure_policy():
     """Signal failures should reject, synthesize, or raise explicitly."""
     tree = try_parse("Neg($close)")

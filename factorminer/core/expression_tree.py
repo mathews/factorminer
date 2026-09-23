@@ -218,12 +218,12 @@ class OperatorNode(Node):
 def _safe_div(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     """Division that returns 0 where the denominator is near zero.
 
-    Single-mask form: one boolean and one ``where``, instead of nested
-    ``where`` that rebuilds a safe denominator array then divides again.
+    ``np.where`` evaluates the division on invalid elements before masking it.
     """
     mask = np.abs(b) > _EPS
-    with np.errstate(divide="ignore", invalid="ignore"):
-        return np.where(mask, a / b, 0.0)
+    out = np.zeros(np.broadcast_shapes(np.shape(a), np.shape(b)), dtype=np.float64)
+    np.divide(a, b, out=out, where=mask)
+    return out
 
 
 def _safe_log(x: np.ndarray) -> np.ndarray:
@@ -390,7 +390,7 @@ def _ts_corr(sx: np.ndarray, sy: np.ndarray) -> np.ndarray:
     sx_std = np.sqrt(_row_nanvar(sx))
     sy_std = np.sqrt(_row_nanvar(sy))
     denom = sx_std * sy_std
-    return np.where(denom > _EPS, cov / denom, 0.0)
+    return np.divide(cov, denom, out=np.zeros_like(cov), where=denom > _EPS)
 
 
 def _ts_cov(sx: np.ndarray, sy: np.ndarray) -> np.ndarray:
@@ -406,7 +406,7 @@ def _ts_beta(sx: np.ndarray, sy: np.ndarray) -> np.ndarray:
     dy = sy - my
     var_y = np.nansum(dy ** 2, axis=1)
     cov_xy = np.nansum((sx - mx) * dy, axis=1)
-    return np.where(var_y > _EPS, cov_xy / var_y, 0.0)
+    return np.divide(cov_xy, var_y, out=np.zeros_like(cov_xy), where=var_y > _EPS)
 
 
 def _ts_resid(sx: np.ndarray, sy: np.ndarray) -> np.ndarray:
@@ -561,7 +561,10 @@ def _ts_linreg_rsquare(x: np.ndarray, window: int) -> np.ndarray:
         fitted = slope[:, None] * t_vals[None, :] + intercept[:, None]
         ss_res = np.nansum((sx - fitted) ** 2, axis=1)
         ss_tot = np.nansum((sx - x_mean) ** 2, axis=1)
-        out[:, t] = np.where(ss_tot > _EPS, 1.0 - ss_res / ss_tot, np.nan)
+        ratio = np.divide(
+            ss_res, ss_tot, out=np.full_like(ss_tot, np.nan), where=ss_tot > _EPS
+        )
+        out[:, t] = 1.0 - ratio
     return out
 
 

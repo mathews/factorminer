@@ -45,8 +45,18 @@ class LoopExecutionService:
         payload: IterationPayload,
         stage_names: Sequence[str],
     ) -> None:
+        profile = getattr(self.loop, "runtime_profile", None)
         for stage_name in stage_names:
-            self.loop.stages[stage_name].run(self.loop, payload)
+            if profile is None:
+                self.loop.stages[stage_name].run(self.loop, payload)
+                continue
+            with profile.stage(stage_name):
+                self.loop.stages[stage_name].run(self.loop, payload)
+            if stage_name == "evaluate":
+                profile.record_panels(
+                    stage_name, (getattr(result, "signals", None) for result in payload.results)
+                )
+                profile.record_outcomes(stage_name, payload.results)
 
     def execute_iteration(
         self,

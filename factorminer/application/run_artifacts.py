@@ -65,6 +65,9 @@ class MiningArtifactService:
             notes=[],
         )
         loop._run_manifest = manifest.to_dict()
+        profile = getattr(loop, "runtime_profile", None)
+        if profile is not None:
+            loop._run_manifest["runtime_profile"] = profile.to_dict()
         actions = getattr(loop, "research_actions", None)
         if actions is not None:
             loop._run_manifest["research_actions"] = actions.ledger.summary()

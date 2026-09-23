@@ -39,6 +39,7 @@ from factorminer.application.research_actions import build_research_action_servi
 from factorminer.application.research_knowledge import ResearchKnowledgeStore
 from factorminer.application.run_artifacts import MiningArtifactService
 from factorminer.application.runtime_context import MiningRunContext, MiningSettings
+from factorminer.application.runtime_profile import RuntimeProfile
 from factorminer.application.validation_pipeline import ValidationPipeline
 from factorminer.architecture import (
     DatasetContract,
@@ -204,12 +205,14 @@ class RalphLoop:
             benchmark_mode=self.settings.benchmark_mode,
             redundancy_metric=self.settings.redundancy_metric,
             evaluation_kernel=self.evaluation_kernel,
+            default_target=self.dataset_contract.default_target,
         )
         self.pipeline.signal_failure_policy = self.settings.signal_failure_policy
         self.reporter = MiningReporter(self.settings.output_dir)
         self.budget = BudgetTracker()
         self.research_actions = build_research_action_service(self)
         self.signal_failure_policy = self.settings.signal_failure_policy
+        self.runtime_profile = RuntimeProfile()
         self._loop_services = LoopExecutionService(self)
         self._artifact_service = MiningArtifactService(self)
 

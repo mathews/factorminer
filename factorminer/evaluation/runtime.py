@@ -217,10 +217,17 @@ class FactorEvaluationArtifact:
     score_vector: dict | None = None
     research_metrics: dict[str, float] = field(default_factory=dict)
     error: str = ""
+    signals_computed: bool = False
 
     @property
     def succeeded(self) -> bool:
-        return self.parse_ok and self.signals_full is not None and not self.error
+        return self.parse_ok and (self.signals_computed or self.signals_full is not None) and not self.error
+
+    def release_signals(self) -> None:
+        """Free signal panels after their metrics and benchmark selection are recorded."""
+        self.signals_computed = self.signals_computed or self.signals_full is not None
+        self.signals_full = None
+        self.split_signals.clear()
 
 
 def load_runtime_dataset(
@@ -231,8 +238,9 @@ def load_runtime_dataset(
     from factorminer.data.preprocessor import preprocess
     from factorminer.data.tensor_builder import TensorConfig, build_tensor
 
-    raw_df = raw_df.copy()
-    raw_df["datetime"] = pd.to_datetime(raw_df["datetime"])
+    if not pd.api.types.is_datetime64_any_dtype(raw_df["datetime"]):
+        raw_df = raw_df.copy()
+        raw_df["datetime"] = pd.to_datetime(raw_df["datetime"])
 
     target_specs = _resolve_target_specs(cfg)
     target_df = compute_targets(raw_df, target_specs)
@@ -343,11 +351,33 @@ def evaluate_factors(
     dataset: EvaluationDataset,
     signal_failure_policy: str = "reject",
     target_name: str | None = None,
+    *,
+    retain_splits: Sequence[str] | None = None,
+    signal_dtype: str = "float64",
 ) -> list[FactorEvaluationArtifact]:
-    """Recompute factor signals and metrics across all dataset splits."""
+    """Recompute metrics on float64 signals, retaining only requested panels.
+
+    With ``retain_splits=None`` the full panel and split views are retained for
+    general analysis. Benchmark callers can request only the splits needed for
+    admission or reporting, then release them once selection is complete.
+    """
     artifacts: list[FactorEvaluationArtifact] = []
     active_target_name = target_name or dataset.default_target
     active_returns = dataset.get_target(active_target_name)
+    dtype = np.dtype(signal_dtype)
+    if dtype not in (np.dtype("float32"), np.dtype("float64")):
+        raise ValueError("signal_dtype must be float32 or float64")
+    requested = None if retain_splits is None else set(retain_splits)
+    if requested is not None and requested - dataset.splits.keys():
+        raise ValueError(f"Unknown retained splits: {sorted(requested - dataset.splits.keys())}")
+
+    selectors = {}
+    for split_name, split in dataset.splits.items():
+        indices = np.asarray(split.indices)
+        if indices.size and np.array_equal(indices, np.arange(indices[0], indices[0] + indices.size)):
+            selectors[split_name] = slice(int(indices[0]), int(indices[-1]) + 1)
+        else:
+            selectors[split_name] = indices
 
     for factor in factors:
         artifact = FactorEvaluationArtifact(
@@ -383,11 +413,19 @@ def evaluate_factors(
             artifacts.append(artifact)
             continue
 
-        artifact.signals_full = np.asarray(signals, dtype=np.float64)
+        signals = np.asarray(signals, dtype=np.float64)
+        artifact.signals_computed = True
+        if requested is None:
+            artifact.signals_full = signals
 
         for split_name, split in dataset.splits.items():
-            split_signals = artifact.signals_full[:, split.indices]
-            artifact.split_signals[split_name] = split_signals
+            split_signals = signals[:, selectors[split_name]]
+            if requested is None:
+                artifact.split_signals[split_name] = split_signals
+            elif split_name in requested:
+                artifact.split_signals[split_name] = np.array(
+                    split_signals, dtype=dtype, copy=True, order="C"
+                )
             active_split_target = split.get_target(active_target_name)
             active_stats = compute_factor_stats(split_signals, active_split_target)
             artifact.split_stats[split_name] = active_stats

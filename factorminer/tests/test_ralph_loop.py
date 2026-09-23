@@ -324,6 +324,19 @@ class TestValidationPipeline:
         # IC should be a number (may or may not pass threshold)
         assert isinstance(result.ic_mean, float)
 
+    def test_named_default_target_drives_candidate_metrics(self, synthetic_data):
+        data_tensor, returns = synthetic_data
+        pipeline = ValidationPipeline(
+            data_tensor=data_tensor,
+            returns=returns,
+            target_panels={"research": returns},
+            default_target="research",
+            fast_screen_assets=0,
+        )
+        result = pipeline.evaluate_candidate("neg_close", "Neg($close)")
+        assert result.parse_ok
+        assert result.ic_mean == result.target_stats["research"]["ic_mean"]
+
     def test_batch_evaluation(self, pipeline):
         candidates = [
             ("f1", "Neg($close)"),
@@ -1092,6 +1105,12 @@ class TestCheckpointResume:
         assert manifest["loop_type"] == "ralph"
         assert manifest["artifact_paths"]["run_manifest"] == str(manifest_path)
         assert manifest["dataset_summary"]["data_tensor_shape"] == list(data_tensor.shape)
+        profile = manifest["runtime_profile"]
+        assert profile["schema_version"] == "runtime-profile-v1"
+        evaluate = profile["stages"]["evaluate"]
+        assert evaluate["calls"] == loop.iteration
+        assert sum(evaluate["outcomes"].values()) >= evaluate["panel_count"] > 0
+        assert evaluate["seconds"] > 0.0
 
         assert library.size > 0
         exported_library = json.loads((Path(tmp_dir) / "factor_library.json").read_text())

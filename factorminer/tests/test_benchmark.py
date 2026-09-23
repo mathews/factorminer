@@ -392,7 +392,11 @@ def test_benchmark_runtime_contract_includes_walk_forward_cost_and_strategy_grid
     assert payload["strategy_grid"]["selected_backend"] == "numpy"
 
 
-def test_evaluate_frozen_set_records_cost_and_capacity_stress():
+def test_evaluate_frozen_set_records_cost_and_capacity_stress(monkeypatch):
+    from factorminer.evaluation.selection import FactorSelector
+
+    # This test exercises the benchmark metrics, not the optional native model.
+    monkeypatch.setattr(FactorSelector, "xgboost_selection", lambda self, *args, **kwargs: [])
     dataset = _benchmark_dataset()
     frozen = [
         _artifact(1, "Neg($close)", 0.07, 0.8, 1.0),

@@ -255,6 +255,31 @@ def test_create_provider_cascade_from_config():
     assert isinstance(provider.frontier, MockProvider)
 
 
+def test_create_provider_keeps_compatible_primary_separate_from_draft():
+    provider = create_provider(
+        {
+            "provider": "openai_compatible",
+            "model": "primary-model",
+            "base_url": "https://primary.example/v1",
+            "api_key": "primary-key",
+            "cascade": {
+                "enabled": True,
+                "draft_provider": "openai_compatible",
+                "draft_model": "draft-model",
+                "draft_base_url": "https://draft.example/v1",
+                "draft_api_key": "draft-key",
+            },
+        }
+    )
+    assert isinstance(provider, CascadeProvider)
+    assert provider.frontier.model == "primary-model"
+    assert provider.frontier.base_url == "https://primary.example/v1"
+    assert provider.frontier.api_key == "primary-key"
+    assert provider.draft.model == "draft-model"
+    assert provider.draft.base_url == "https://draft.example/v1"
+    assert provider.draft.api_key == "draft-key"
+
+
 def test_openai_compatible_does_not_read_openai_api_key(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-frontier-secret")
     local = OpenAICompatibleProvider(

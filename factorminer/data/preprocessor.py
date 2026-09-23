@@ -62,11 +62,11 @@ class PreprocessConfig:
 def compute_vwap(df: pd.DataFrame) -> pd.DataFrame:
     """Add ``vwap`` column: amount / volume.  NaN when volume is zero."""
     df = df.copy()
-    df["vwap"] = np.where(
-        df["volume"] > 0,
-        df["amount"] / df["volume"],
-        np.nan,
-    )
+    amount = df["amount"].to_numpy(dtype=np.float64, copy=False)
+    volume = df["volume"].to_numpy(dtype=np.float64, copy=False)
+    vwap = np.full(len(df), np.nan, dtype=np.float64)
+    np.divide(amount, volume, out=vwap, where=volume > 0)
+    df["vwap"] = vwap
     return df
 
 
@@ -76,7 +76,6 @@ def compute_returns(df: pd.DataFrame) -> pd.DataFrame:
     Returns are computed as ``close[t] / close[t-1] - 1`` within each asset.
     The first observation per asset is NaN.
     """
-    df = df.copy()
     df = df.sort_values(["asset_id", "datetime"])
     df["returns"] = df.groupby("asset_id")["close"].pct_change()
     return df
@@ -135,11 +134,6 @@ def mask_halts(df: pd.DataFrame) -> pd.DataFrame:
 # Missing data handling
 # ---------------------------------------------------------------------------
 
-def _extract_date(dt_series: pd.Series) -> pd.Series:
-    """Return the date component of a datetime series."""
-    return dt_series.dt.date
-
-
 def fill_missing(
     df: pd.DataFrame,
     ffill_limit: int | None = None,
@@ -165,31 +159,27 @@ def fill_missing(
     columns : sequence of str, optional
         Columns to fill.  Defaults to numeric columns.
     """
+    if cross_fill_method not in {"median", "mean"}:
+        raise ValueError(f"Unknown cross_fill_method: {cross_fill_method}")
     df = df.copy()
     if columns is None:
         columns = df.select_dtypes(include=[np.number]).columns.tolist()
     columns = [c for c in columns if c in df.columns]
+    missing = [c for c in columns if df[c].isna().any()]
+    if not missing:
+        return df
 
-    # Stage 1: forward fill within (asset, date)
-    df["_date"] = _extract_date(df["datetime"])
-    for col in columns:
-        df[col] = df.groupby(["asset_id", "_date"])[col].transform(
-            lambda s: s.ffill(limit=ffill_limit)
-        )
+    # A single grouped fill replaces one Python callback per asset/session/column.
+    day = df["datetime"].dt.normalize()
+    df[missing] = df.groupby([df["asset_id"], day], sort=False)[missing].ffill(
+        limit=ffill_limit
+    )
 
-    # Stage 2: cross-sectional fill per datetime
-    if cross_fill_method == "median":
-        agg_func = "median"
-    elif cross_fill_method == "mean":
-        agg_func = "mean"
-    else:
-        raise ValueError(f"Unknown cross_fill_method: {cross_fill_method}")
-
-    for col in columns:
-        cross_vals = df.groupby("datetime")[col].transform(agg_func)
+    for col in missing:
+        if not df[col].isna().any():
+            continue
+        cross_vals = df.groupby("datetime", sort=False)[col].transform(cross_fill_method)
         df[col] = df[col].fillna(cross_vals)
-
-    df = df.drop(columns=["_date"])
     return df
 
 
@@ -219,12 +209,10 @@ def winsorise(
     columns = [c for c in columns if c in df.columns]
 
     for col in columns:
-        lo = df.groupby("datetime")[col].transform(
-            lambda s: np.nanpercentile(s, lower) if s.notna().any() else np.nan
-        )
-        hi = df.groupby("datetime")[col].transform(
-            lambda s: np.nanpercentile(s, upper) if s.notna().any() else np.nan
-        )
+        grouped = df.groupby("datetime", sort=False)[col]
+        bounds = grouped.quantile([lower / 100.0, upper / 100.0]).unstack()
+        lo = df["datetime"].map(bounds[lower / 100.0])
+        hi = df["datetime"].map(bounds[upper / 100.0])
         df[col] = df[col].clip(lower=lo, upper=hi)
     return df
 
@@ -288,11 +276,9 @@ def quality_check(
     if n_assets == 0:
         return df
 
-    # Count non-NaN per datetime
-    checks = df.groupby("datetime")[list(columns)].apply(
-        lambda g: g.notna().all(axis=1).sum() / n_assets
-    )
-    valid_dts = checks[checks >= min_nonnan_ratio].index
+    valid_rows = df[list(columns)].notna().all(axis=1)
+    counts = valid_rows.groupby(df["datetime"], sort=False).sum()
+    valid_dts = counts.index[counts / n_assets >= min_nonnan_ratio]
     before = df["datetime"].nunique()
     df = df[df["datetime"].isin(valid_dts)]
     after = df["datetime"].nunique()
