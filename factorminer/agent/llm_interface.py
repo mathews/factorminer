@@ -837,7 +837,7 @@ def _build_raw_provider(config: dict[str, Any], role: str) -> LLMProvider:
     from factorminer.agent.provider_config import resolve_credential
 
     provider_name = config.get("provider", "mock")
-    cls = _PROVIDER_MAP.get(provider_name)
+    cls: type[LLMProvider] | None = _PROVIDER_MAP.get(provider_name)
     if cls is None:
         raise ValueError(
             f"Unknown LLM provider '{provider_name}'. "

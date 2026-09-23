@@ -6,6 +6,7 @@ import hashlib
 import logging
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -414,7 +415,7 @@ def evaluate_factors(
     for start in range(0, len(factors), max(int(plan_batch_size), 1)):
         chunk = factors[start : start + max(int(plan_batch_size), 1)]
         chunk_artifacts: list[FactorEvaluationArtifact] = []
-        parsed: list[tuple[FactorEvaluationArtifact, object]] = []
+        parsed: list[tuple[FactorEvaluationArtifact, Any]] = []
         for factor in chunk:
             artifact = FactorEvaluationArtifact(
                 factor_id=factor.id,
@@ -439,7 +440,7 @@ def evaluate_factors(
         )
         for index, signals, error in outcomes:
             artifact, tree = parsed[index]
-            if error is not None:
+            if error is not None or signals is None:
                 artifact.error = str(error)
                 continue
             if signal_store is not None:
@@ -483,13 +484,14 @@ def _record_split_signals(
     artifact.signals_computed = True
     if requested is None:
         artifact.signals_full = signals
+    retained = cast(dict[str, np.ndarray], artifact.split_signals)
 
     for split_name, split in dataset.splits.items():
         split_signals = signals[:, selectors[split_name]]
         if requested is None:
-            artifact.split_signals[split_name] = split_signals
+            retained[split_name] = split_signals
         elif split_name in requested:
-            artifact.split_signals[split_name] = np.array(
+            retained[split_name] = np.array(
                 split_signals, dtype=dtype, copy=True, order="C"
             )
         active_split_target = split.get_target(active_target_name)
@@ -539,7 +541,7 @@ def compute_tree_signals(
 ) -> np.ndarray:
     """Evaluate an expression tree under an explicit failure policy."""
     try:
-        value: np.ndarray | BaseException = compile_tree(tree).evaluate(data_dict)
+        value: np.ndarray | Exception = compile_tree(tree).evaluate(data_dict)
     except Exception as exc:  # noqa: BLE001 - resolved by the failure policy
         value = exc
     return _finalize_signals(tree.to_string(), value, returns_shape, signal_failure_policy)
@@ -552,6 +554,8 @@ def _finalize_signals(
     signal_failure_policy: str,
 ) -> np.ndarray:
     if isinstance(value, BaseException):
+        if not isinstance(value, Exception):
+            raise value
         return _handle_signal_failure(
             formula_str=formula_str,
             returns_shape=returns_shape,

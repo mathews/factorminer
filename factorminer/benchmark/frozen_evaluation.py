@@ -402,9 +402,12 @@ def evaluate_frozen_set(
 
     selection_specs = {}
 
+    selections_out: dict[str, Any] = result["selections"]  # type: ignore[assignment]
+    warnings_out: list[str] = result["warnings"]  # type: ignore[assignment]
+
     def mark_unavailable(name: str, record: dict[str, Any]) -> None:
-        result["selections"][name] = record
-        result["warnings"].append(f"{name} unavailable: {record['cause']}")
+        selections_out[name] = record
+        warnings_out.append(f"{name} unavailable: {record['cause']}")
 
     for name, method in (
         ("lasso", selector.lasso_selection),

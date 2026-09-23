@@ -172,7 +172,8 @@ class SplitSignalStore:
             if path is None:
                 raise SignalUnavailableError(f"No stored {split!r} signals for {key.formula_digest[:12]}")
             self.spill_reads += 1
-        return np.load(path, mmap_mode="r")
+        mapped: np.ndarray = np.load(path, mmap_mode="r")
+        return mapped
 
     def release(self, key: SignalKey) -> None:
         token = key.token

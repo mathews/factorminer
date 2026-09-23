@@ -72,7 +72,8 @@ class PlanStep:
         if self.kind == "operator":
             assert self.operator is not None
             return _dispatch_operator(self.operator, inputs, dict(self.params))
-        return self.node.evaluate(data)
+        result: np.ndarray = self.node.evaluate(data)
+        return result
 
 
 def _hash(*parts: str) -> str:
@@ -187,7 +188,8 @@ class ExpressionPlan:
         (_, value), = batch.iter_outputs(data)
         if isinstance(value, BaseException):
             raise value
-        return value
+        result: np.ndarray = value
+        return result
 
 
 def compile_tree(tree: ExpressionTree | Any) -> ExpressionPlan:

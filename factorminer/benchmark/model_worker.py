@@ -82,11 +82,11 @@ def run_isolated_selection(
     with tempfile.TemporaryDirectory(prefix="factorminer-model-") as tmp:
         inputs = Path(tmp) / "inputs.npz"
         output = Path(tmp) / "ranking.json"
-        np.savez(
-            inputs,
-            returns=np.asarray(returns),
-            **{f"signal_{int(fid)}": np.asarray(panel) for fid, panel in factor_signals.items()},
+        arrays: dict[str, Any] = {"returns": np.asarray(returns)}
+        arrays.update(
+            {f"signal_{int(fid)}": np.asarray(panel) for fid, panel in factor_signals.items()}
         )
+        np.savez(inputs, **arrays)
         try:
             completed = subprocess.run(
                 [sys.executable, "-m", "factorminer.benchmark.model_worker",

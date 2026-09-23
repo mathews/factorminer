@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
-from scipy.stats import rankdata
+from scipy.stats import rankdata  # type: ignore[import-untyped]
 
 from factorminer.domain.dependence import (
     DependenceMetric,
@@ -74,12 +74,15 @@ class DependenceIndex:
         if signals.flags.writeable:
             signals.flags.writeable = False
         self._forget(ident)
-        self._refs[ident] = weakref.ref(signals, lambda _ref, ident=ident: self._on_collect(ident))
+        self._refs[ident] = weakref.ref(signals, self._collector(ident))
         return ident
 
-    def _on_collect(self, ident: int) -> None:
-        with self._lock:
-            self._forget(ident)
+    def _collector(self, ident: int) -> Any:
+        def on_collect(_ref: Any) -> None:
+            with self._lock:
+                self._forget(ident)
+
+        return on_collect
 
     def _forget(self, ident: int) -> None:
         self._refs.pop(ident, None)

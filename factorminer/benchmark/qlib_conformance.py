@@ -19,7 +19,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 import numpy as np
-import pandas as pd
+import pandas as pd  # type: ignore[import-untyped]
 
 from factorminer.data.tensor_builder import TargetSpec, _resolve_target_offsets
 
