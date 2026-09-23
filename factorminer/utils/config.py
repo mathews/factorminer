@@ -117,8 +117,31 @@ class DataConfig:
         ]
     )
     default_target: str = "paper"
+    # Declared data provenance (see DatasetContract). Undeclared values keep
+    # historical campaign identity unchanged.
+    source_version: str = ""
+    availability: str = "unspecified"
+    availability_lag_bars: int = 0
+    universe_policy: str = "unspecified"
+    adjustment_policy: str = "unspecified"
 
     def validate(self) -> None:
+        from factorminer.architecture.dataset_contract import (
+            ADJUSTMENT_POLICIES,
+            AVAILABILITY_POLICIES,
+            UNIVERSE_POLICIES,
+        )
+
+        if self.availability not in AVAILABILITY_POLICIES:
+            raise ValueError(f"data.availability must be one of {sorted(AVAILABILITY_POLICIES)}")
+        if self.universe_policy not in UNIVERSE_POLICIES:
+            raise ValueError(f"data.universe_policy must be one of {sorted(UNIVERSE_POLICIES)}")
+        if self.adjustment_policy not in ADJUSTMENT_POLICIES:
+            raise ValueError(
+                f"data.adjustment_policy must be one of {sorted(ADJUSTMENT_POLICIES)}"
+            )
+        if self.availability_lag_bars < 0:
+            raise ValueError("data.availability_lag_bars must be >= 0")
         if len(self.train_period) != 2:
             raise ValueError("train_period must be a list of [start, end]")
         if self.validation_period and len(self.validation_period) != 2:

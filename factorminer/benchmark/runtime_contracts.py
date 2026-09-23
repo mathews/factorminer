@@ -187,7 +187,17 @@ def _benchmark_dataset_contract(cfg, dataset: Any) -> dict[str, Any]:
         "asset_count": int(_safe_len(getattr(dataset, "asset_ids", None))),
         "period_count": int(_safe_len(getattr(dataset, "timestamps", None))),
         "split_sizes": split_sizes,
+        "replay_identity": _replay_identity(cfg, dataset),
     }
+
+
+def _replay_identity(cfg, dataset: Any) -> dict[str, Any] | None:
+    """Content and provenance identity of a loaded runtime dataset, if available."""
+    if not hasattr(dataset, "data_dict") or not hasattr(dataset, "splits"):
+        return None
+    from factorminer.architecture.dataset_contract import DatasetContract
+
+    return DatasetContract.from_runtime_dataset(cfg, dataset).replay_identity()
 
 
 def build_benchmark_runtime_contract(

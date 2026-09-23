@@ -40,6 +40,53 @@ uv run factorminer resample-data data/binance_crypto_5m.csv \
   /tmp/binance_crypto_10m.csv --rule 10min
 ```
 
+## Dataset contract and replay
+
+`DatasetContract` records shapes, targets, and periods, and records the data
+rules when you declare them in the `data` config section:
+
+| Field | Values |
+| --- | --- |
+| `source_version` | vendor release, snapshot tag, or archive digest |
+| `availability` | `bar_close`, `next_bar_open`, `declared_timestamp` (plus `availability_lag_bars`) |
+| `universe_policy` | `static`, `point_in_time`, `survivorship_biased` |
+| `adjustment_policy` | `none`, `split_adjusted`, `split_dividend_adjusted`, `back_adjusted_futures` |
+
+Undeclared fields stay `unspecified` and are left out of campaign identity, so
+existing campaigns resume unchanged. Declared fields become part of it. Runtime
+datasets also record the preprocessing configuration as `preprocessing_digest`.
+
+`replay_identity()` adds `panel_digest`, which covers features, timestamps and
+assets, and `target_digest`, which covers target panels and definitions. Run
+manifests store it as `dataset_replay_identity`. Benchmark freeze contracts
+store it as `replay_identity`. `replay_mismatches(recorded)` names every field
+where a replay used different inputs.
+
+## Qlib baseline conformance
+
+Alpha158 and Alpha360 are Qlib handler workflows. Each has a label expression,
+inference and learning processors, a fit window, an instrument universe, and a
+frequency, so matching formula lists alone is not a comparable baseline.
+`factorminer.benchmark.qlib_conformance` describes these settings as a
+`QlibHandlerSpec`. Its defaults follow `qlib/contrib/data/handler.py`. It can
+also be built from a workflow `handler` block.
+
+`check_qlib_conformance` compares the spec with the FactorMiner config and
+dataset contract. It checks:
+
+- the label as start/end price and offsets. Qlib's default
+  `Ref($close, -2)/Ref($close, -1) - 1` equals a `close_to_close` target with
+  `entry_delay_bars: 1` and `holding_bars: 1`;
+- the frequency, universe, and fit window;
+- the inference and label processors;
+- the declared availability, universe, and adjustment policies.
+
+It then compares values that both systems exported for the same
+`(datetime, instrument)` rows, requiring identical NaN positions and values
+within tolerance. `require_conformance` raises before any performance is
+reported unless no blocking difference remains and every value check passed.
+Differences you deliberately accept stay listed in the report.
+
 ## Metric contract
 
 The `ic_*` fields use cross-sectional Spearman correlation between signal and

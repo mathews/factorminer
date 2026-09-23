@@ -99,6 +99,7 @@ class EvaluationDataset:
     target_panels: dict[str, np.ndarray] = field(default_factory=dict)
     target_specs: dict[str, TargetSpec] = field(default_factory=dict)
     default_target: str = "target"
+    preprocessing: dict = field(default_factory=dict)
 
     def get_split(self, name: str) -> DatasetSplit:
         if name not in self.splits:
@@ -250,7 +251,9 @@ def load_runtime_dataset(
     cfg,
 ) -> EvaluationDataset:
     """Load raw market data into a canonical evaluation dataset."""
-    from factorminer.data.preprocessor import preprocess
+    from dataclasses import asdict
+
+    from factorminer.data.preprocessor import PreprocessConfig, preprocess
     from factorminer.data.tensor_builder import TensorConfig, build_tensor
 
     if not pd.api.types.is_datetime64_any_dtype(raw_df["datetime"]):
@@ -261,7 +264,8 @@ def load_runtime_dataset(
     target_df = compute_targets(raw_df, target_specs)
     target_columns = [spec.column_name for spec in target_specs]
     merge_columns = ["datetime", "asset_id", *target_columns]
-    processed_df = preprocess(raw_df)
+    preprocess_config = PreprocessConfig()
+    processed_df = preprocess(raw_df, preprocess_config)
     processed_df = processed_df.merge(
         target_df[merge_columns],
         on=["datetime", "asset_id"],
@@ -358,6 +362,12 @@ def load_runtime_dataset(
         target_panels=target_panels,
         target_specs={spec.name: spec for spec in target_specs},
         default_target=cfg.data.default_target,
+        preprocessing={
+            "pipeline": "factorminer.data.preprocessor.preprocess",
+            "config": asdict(preprocess_config),
+            "feature_columns": list(feature_columns),
+            "tensor": {"backend": "numpy", "dtype": "float64"},
+        },
     )
 
 

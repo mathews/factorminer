@@ -301,6 +301,7 @@ class RalphLoop:
         )
         self._run_manifest["paper_protocol"] = self.protocol.runtime_contract()
         self._run_manifest["dataset_contract"] = self.dataset_contract.to_dict()
+        self._run_manifest["dataset_replay_identity"] = self.dataset_contract.replay_identity()
         self._run_manifest["trial_accounting"] = {
             "schema_version": "factor-trial-ledger-v1",
             "campaign_id": self.trial_campaign_id,
