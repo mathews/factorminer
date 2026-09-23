@@ -84,6 +84,21 @@ is `None` for recursive or cumulative operators. A time tile must add this
 lookback before its first period. Cross-sectional operators need every asset
 at each period.
 
+Retained signal panels are identified by a `SignalKey`, which records the
+dataset fingerprint, formula digest, operator semantics version, backend, and
+dtype (`domain/signal_ref.py`). When `evaluation.signal_cache_mb` is set,
+benchmark freezing and frozen evaluation store retained splits in a
+`SplitSignalStore` (`evaluation/signal_store.py`). Artifacts then hold a
+`SignalRef` whose `split_signals` mapping reads through the store. Panels
+beyond the resident budget spill least-recently-used to temporary `.npy` files
+and are read back exactly through read-only memory maps. A duplicate formula
+shares one stored panel. `release_signals()` frees the panel but keeps the
+scores and the key. Resident memory can exceed the budget by at most one
+formula's retained splits while it is being stored. Admitted library factors
+still hold their own signals for dependence checks. Table 1 results record
+store statistics under `signal_cache`. When `signal_cache_mb` is unset, every
+retained panel stays in memory, as before.
+
 ### Numerical backends
 
 `evaluation.backend: gpu` accelerates candidate-to-library Spearman correlation

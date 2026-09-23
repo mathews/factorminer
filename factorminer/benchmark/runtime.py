@@ -132,6 +132,7 @@ from factorminer.evaluation.metrics import METRIC_VERSION
 from factorminer.evaluation.runtime import (
     evaluate_factors,
 )
+from factorminer.evaluation.signal_store import open_signal_store
 from factorminer.operators.c_backend import backend_available as c_backend_available
 
 logger = logging.getLogger(__name__)
@@ -247,12 +248,19 @@ def run_table1_benchmark(
         selection_split = (
             "validation" if "validation" in getattr(freeze_dataset, "splits", {}) else "train"
         )
+        signal_store = open_signal_store(
+            freeze_dataset,
+            retain_splits=("train", selection_split),
+            dtype=getattr(cfg.evaluation, "signal_dtype", "float64"),
+            cache_mb=getattr(cfg.evaluation, "signal_cache_mb", None),
+        )
         artifacts = evaluate_factors(
             factors,
             freeze_dataset,
             signal_failure_policy="reject",
-            retain_splits=("train", selection_split),
+            retain_splits=None if signal_store else ("train", selection_split),
             signal_dtype=getattr(cfg.evaluation, "signal_dtype", "float64"),
+            signal_store=signal_store,
         )
 
         library_cfg = _cfg_with_overrides(cfg, cfg.benchmark.freeze_universe)
@@ -276,6 +284,9 @@ def run_table1_benchmark(
             artifact.release_signals()
         for factor in library.list_factors():
             factor.signals = None
+        signal_cache_stats = signal_store.stats() if signal_store else None
+        if signal_store is not None:
+            signal_store.close()
 
         baseline_result = {
             "baseline": baseline,
@@ -292,6 +303,7 @@ def run_table1_benchmark(
             "freeze_library_size": library.size,
             "freeze_stats": library_stats,
             "selection_split": selection_split,
+            "signal_cache": signal_cache_stats,
             "frozen_top_k": [
                 {
                     "name": artifact.name,
@@ -358,6 +370,7 @@ def run_table1_benchmark(
                 include_capacity_evidence=bool(cfg.phase2.capacity.enabled),
                 family_ic_series=family_ic_series,
                 signal_dtype=getattr(cfg.evaluation, "signal_dtype", "float64"),
+                signal_cache_mb=getattr(cfg.evaluation, "signal_cache_mb", None),
             )
 
         result_path = benchmark_dir / f"{baseline}.json"

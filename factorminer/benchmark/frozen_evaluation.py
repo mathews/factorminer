@@ -18,6 +18,7 @@ from factorminer.evaluation.runtime import (
     compute_correlation_matrix,
     evaluate_factors,
 )
+from factorminer.evaluation.signal_store import open_signal_store
 
 
 def _default_capacity_levels() -> list[float]:
@@ -196,6 +197,7 @@ def evaluate_frozen_set(
     include_capacity_evidence: bool = False,
     family_ic_series: dict[str, np.ndarray] | None = None,
     signal_dtype: str = "float64",
+    signal_cache_mb: float | None = None,
 ) -> dict:
     """Evaluate one frozen factor set on one universe."""
     if cost_bps is None:
@@ -211,12 +213,16 @@ def evaluate_frozen_set(
         )
         for artifact in frozen
     )
+    signal_store = open_signal_store(
+        dataset, retain_splits=(fit_split, split_name), dtype=signal_dtype, cache_mb=signal_cache_mb
+    )
     artifacts = evaluate_factors(
         factors,
         dataset,
         signal_failure_policy="reject",
-        retain_splits=(fit_split, split_name),
+        retain_splits=None if signal_store else (fit_split, split_name),
         signal_dtype=signal_dtype,
+        signal_store=signal_store,
     )
     succeeded = [artifact for artifact in artifacts if artifact.succeeded]
 
@@ -248,6 +254,8 @@ def evaluate_frozen_set(
         result["warnings"].append("No frozen factors recomputed successfully on this universe")
         for artifact in artifacts:
             artifact.release_signals()
+        if signal_store is not None:
+            signal_store.close()
         return result
 
     result["library"] = {
@@ -435,4 +443,6 @@ def evaluate_frozen_set(
 
     for artifact in artifacts:
         artifact.release_signals()
+    if signal_store is not None:
+        signal_store.close()
     return result

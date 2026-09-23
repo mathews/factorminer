@@ -57,6 +57,7 @@ class EvaluationConfig:
     redundancy_metric: str = "spearman"
     signal_failure_policy: str = "reject"
     signal_dtype: str = "float64"
+    signal_cache_mb: float | None = None
 
     def validate(self) -> None:
         if self.num_workers < 1:
@@ -75,6 +76,8 @@ class EvaluationConfig:
             )
         if self.signal_dtype not in ("float32", "float64"):
             raise ValueError("signal_dtype must be float32 or float64")
+        if self.signal_cache_mb is not None and self.signal_cache_mb < 0:
+            raise ValueError("signal_cache_mb must be >= 0")
 
 
 @dataclass

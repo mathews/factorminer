@@ -10,14 +10,20 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-from factorminer.core.expression_plan import compile_batch, compile_tree
+from factorminer.core.expression_plan import (
+    OPERATOR_SEMANTICS_VERSION,
+    compile_batch,
+    compile_tree,
+)
 from factorminer.core.factor_library import Factor
 from factorminer.core.parser import try_parse
 from factorminer.data.tensor_builder import TargetSpec, compute_targets
+from factorminer.domain.signal_ref import SignalKey, SignalRef, SplitSignalView
 from factorminer.evaluation.metrics import (
     compute_factor_stats,
     compute_pairwise_correlation,
 )
+from factorminer.evaluation.signal_store import SplitSignalStore, split_selectors
 
 logger = logging.getLogger(__name__)
 
@@ -212,23 +218,31 @@ class FactorEvaluationArtifact:
     category: str
     parse_ok: bool
     signals_full: np.ndarray | None = None
-    split_signals: dict[str, np.ndarray] = field(default_factory=dict)
+    split_signals: Mapping[str, np.ndarray] = field(default_factory=dict)
     split_stats: dict[str, dict] = field(default_factory=dict)
     target_stats: dict[str, dict[str, dict]] = field(default_factory=dict)
     score_vector: dict | None = None
     research_metrics: dict[str, float] = field(default_factory=dict)
     error: str = ""
     signals_computed: bool = False
+    signal_ref: SignalRef | None = None
 
     @property
     def succeeded(self) -> bool:
         return self.parse_ok and (self.signals_computed or self.signals_full is not None) and not self.error
 
     def release_signals(self) -> None:
-        """Free signal panels after their metrics and benchmark selection are recorded."""
+        """Free signal panels after their metrics and benchmark selection are recorded.
+
+        Scores and ``signal_ref.key`` (the signal's provenance) are retained.
+        """
         self.signals_computed = self.signals_computed or self.signals_full is not None
         self.signals_full = None
-        self.split_signals.clear()
+        if isinstance(self.split_signals, SplitSignalView):
+            self.split_signals.clear()
+            self.split_signals = {}
+        else:
+            self.split_signals.clear()  # type: ignore[attr-defined]
 
 
 def load_runtime_dataset(
@@ -356,6 +370,7 @@ def evaluate_factors(
     retain_splits: Sequence[str] | None = None,
     signal_dtype: str = "float64",
     plan_batch_size: int = 16,
+    signal_store: SplitSignalStore | None = None,
 ) -> list[FactorEvaluationArtifact]:
     """Recompute metrics on float64 signals, retaining only requested panels.
 
@@ -365,6 +380,10 @@ def evaluate_factors(
     With ``retain_splits=None`` the full panel and split views are retained for
     general analysis. Benchmark callers can request only the splits needed for
     admission or reporting, then release them once selection is complete.
+
+    With ``signal_store`` the retained splits are the store's, and artifacts
+    hold :class:`SignalRef` handles instead of arrays; the store's byte budget
+    then bounds resident signal memory regardless of candidate count.
     """
     artifacts: list[FactorEvaluationArtifact] = []
     active_target_name = target_name or dataset.default_target
@@ -373,16 +392,14 @@ def evaluate_factors(
     if dtype not in (np.dtype("float32"), np.dtype("float64")):
         raise ValueError("signal_dtype must be float32 or float64")
     requested = None if retain_splits is None else set(retain_splits)
+    if signal_store is not None:
+        if requested is not None and requested != set(signal_store.retain_splits):
+            raise ValueError("retain_splits must match the signal store's retained splits")
+        requested = set(signal_store.retain_splits)
     if requested is not None and requested - dataset.splits.keys():
         raise ValueError(f"Unknown retained splits: {sorted(requested - dataset.splits.keys())}")
 
-    selectors = {}
-    for split_name, split in dataset.splits.items():
-        indices = np.asarray(split.indices)
-        if indices.size and np.array_equal(indices, np.arange(indices[0], indices[0] + indices.size)):
-            selectors[split_name] = slice(int(indices[0]), int(indices[-1]) + 1)
-        else:
-            selectors[split_name] = indices
+    selectors = split_selectors(dataset.splits)
 
     for start in range(0, len(factors), max(int(plan_batch_size), 1)):
         chunk = factors[start : start + max(int(plan_batch_size), 1)]
@@ -411,16 +428,30 @@ def evaluate_factors(
             signal_failure_policy=signal_failure_policy,
         )
         for index, signals, error in outcomes:
-            artifact = parsed[index][0]
+            artifact, tree = parsed[index]
             if error is not None:
                 artifact.error = str(error)
                 continue
+            if signal_store is not None:
+                key = SignalKey(
+                    dataset_digest=signal_store.dataset_digest,
+                    formula_digest=compile_tree(tree).digest,
+                    operator_version=OPERATOR_SEMANTICS_VERSION,
+                    backend="numpy",
+                    dtype=signal_store.dtype.name,
+                )
+                signal_store.put(key, signals)
+                artifact.signal_ref = SignalRef(key, signal_store, signal_store.retain_splits)
+                artifact.split_signals = SplitSignalView(artifact.signal_ref)
+                requested_for_artifact: set[str] | None = set()
+            else:
+                requested_for_artifact = requested
             _record_split_signals(
                 artifact,
                 signals,
                 dataset,
                 selectors=selectors,
-                requested=requested,
+                requested=requested_for_artifact,
                 dtype=dtype,
                 active_target_name=active_target_name,
             )

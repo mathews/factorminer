@@ -192,11 +192,13 @@ def profile_benchmark(
     catalog: list[tuple[str, str]],
     *,
     profile: RuntimeProfile,
+    signal_cache_mb: float | None = None,
 ) -> dict[str, Any]:
     """Recompute the catalog as frozen-benchmark artifacts and build the library."""
     from factorminer.benchmark.datasets import build_benchmark_library
     from factorminer.core.factor_library import Factor
     from factorminer.evaluation.runtime import evaluate_factors
+    from factorminer.evaluation.signal_store import open_signal_store
 
     factors = [
         Factor(id=index, name=name, formula=formula, category="profile", ic_mean=0.0,
@@ -204,18 +206,26 @@ def profile_benchmark(
         for index, (name, formula) in enumerate(catalog, start=1)
     ]
     selection = "validation" if "validation" in dataset.splits else "train"
+    store = open_signal_store(
+        dataset,
+        retain_splits=("train", selection),
+        dtype=cfg.evaluation.signal_dtype,
+        cache_mb=signal_cache_mb,
+    )
     with profile.stage("benchmark.evaluate"):
         artifacts = evaluate_factors(
             factors,
             dataset,
             signal_failure_policy="reject",
-            retain_splits=("train", selection),
+            retain_splits=None if store else ("train", selection),
             signal_dtype=cfg.evaluation.signal_dtype,
+            signal_store=store,
         )
-    profile.record_panels(
-        "benchmark.evaluate",
-        (panel for artifact in artifacts for panel in artifact.split_signals.values()),
-    )
+    if store is None:
+        profile.record_panels(
+            "benchmark.evaluate",
+            (panel for artifact in artifacts for panel in artifact.split_signals.values()),
+        )
     with profile.stage("benchmark.library"):
         library, stats = build_benchmark_library(artifacts, cfg, split_name="train")
     metrics = [
@@ -234,6 +244,11 @@ def profile_benchmark(
     ]
     for artifact in artifacts:
         artifact.release_signals()
+    if store is not None:
+        for name, value in store.stats().items():
+            if value is not None:
+                profile.count(f"signal_store.{name}", value)
+        store.close()
     return {
         "metrics": metrics,
         "library": [factor.name for factor in library.list_factors()],
@@ -249,6 +264,7 @@ def run_profile(
     seed: int,
     batch_size: int,
     trace_allocations: bool,
+    signal_cache_mb: float | None = None,
 ) -> dict[str, Any]:
     from factorminer.data.loader import load_market_data
     from factorminer.evaluation.runtime import load_runtime_dataset
@@ -263,7 +279,9 @@ def run_profile(
     catalog = build_catalog(candidates, seed)
 
     mining = profile_mining(dataset, cfg, catalog, batch_size=batch_size, profile=profile)
-    benchmark = profile_benchmark(dataset, cfg, catalog, profile=profile)
+    benchmark = profile_benchmark(
+        dataset, cfg, catalog, profile=profile, signal_cache_mb=signal_cache_mb
+    )
     exact = {"mining": mining["decisions"], "benchmark": benchmark["metrics"],
              "mining_library": mining["library"], "benchmark_library": benchmark["library"]}
     return {
@@ -289,6 +307,7 @@ def run_profile(
             "batch_size": batch_size,
             "digest": _digest(catalog),
         },
+        "signal_cache_mb": signal_cache_mb,
         "runtime": profile.to_dict(),
         "library_growth": mining["growth"],
         "benchmark_library_stats": benchmark["library_stats"],
@@ -369,6 +388,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--batch-size", type=int, default=20)
     parser.add_argument("--trace-allocations", action="store_true")
+    parser.add_argument("--signal-cache-mb", type=float, default=None,
+                        help="Resident budget for retained benchmark signals (spills beyond it)")
     parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--compare", type=Path, default=None,
                         help="Baseline profile; exit 1 unless exact results match")
@@ -384,6 +405,7 @@ def main(argv: list[str] | None = None) -> int:
         seed=args.seed,
         batch_size=args.batch_size,
         trace_allocations=args.trace_allocations,
+        signal_cache_mb=args.signal_cache_mb,
     )
     print("\n".join(_summary(result)))
     if args.output:
