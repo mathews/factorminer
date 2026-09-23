@@ -118,6 +118,8 @@ from factorminer.benchmark.statistics import (
     StatisticalComparisonTests,
     aggregate_method_results,
     method_result_dispersion,
+    selection_metric,
+    unavailable_selections,
 )
 from factorminer.benchmark.statistics import (
     DMTestResult as DMTestResult,
@@ -1061,8 +1063,6 @@ def _method_result_from_runtime_payload(
     selections = evaluation.get("selections", {})
     equal_weight = combinations.get("equal_weight", {})
     ic_weighted = combinations.get("ic_weighted", {})
-    lasso = selections.get("lasso", {})
-    xgboost = selections.get("xgboost", {})
     freeze_stats = payload.get("freeze_stats", {})
     succeeded = max(int(freeze_stats.get("succeeded", 0)), 1)
     ic_series = np.asarray(equal_weight.get("ic_series", []), dtype=np.float64)
@@ -1075,10 +1075,11 @@ def _method_result_from_runtime_payload(
         ew_icir=float(equal_weight.get("icir", 0.0) or 0.0),
         icw_ic=float(ic_weighted.get("ic", 0.0) or 0.0),
         icw_icir=float(ic_weighted.get("icir", 0.0) or 0.0),
-        lasso_ic=float(lasso.get("ic", 0.0) or 0.0),
-        lasso_icir=float(lasso.get("icir", 0.0) or 0.0),
-        xgb_ic=float(xgboost.get("ic", 0.0) or 0.0),
-        xgb_icir=float(xgboost.get("icir", 0.0) or 0.0),
+        lasso_ic=selection_metric(selections, "lasso", "ic"),
+        lasso_icir=selection_metric(selections, "lasso", "icir"),
+        xgb_ic=selection_metric(selections, "xgboost", "ic"),
+        xgb_icir=selection_metric(selections, "xgboost", "icir"),
+        unavailable=unavailable_selections(selections),
         n_factors=int(evaluation.get("factor_count", 0) or 0),
         admission_rate=float(freeze_stats.get("admitted", 0)) / succeeded,
         avg_turnover=float(equal_weight.get("turnover", 0.0) or 0.0),

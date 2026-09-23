@@ -567,6 +567,8 @@ class CascadeProvider(LLMProvider):
         self.draft_calls = 0
         self.frontier_calls = 0
         self.escalations = 0
+        self.draft_failures = 0
+        self.last_draft_error = ""
 
     def _draft_is_acceptable(self, raw_text: str) -> bool:
         """Return True when the deterministic DSL parser accepts the draft."""
@@ -592,14 +594,22 @@ class CascadeProvider(LLMProvider):
         cacheable_prefix: str | None = None,
     ) -> str:
         self.draft_calls += 1
-        draft_text = self.draft.generate(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            cacheable_prefix=cacheable_prefix,
-        )
-        if self._draft_is_acceptable(draft_text):
+        try:
+            draft_text = self.draft.generate(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                cacheable_prefix=cacheable_prefix,
+            )
+        except Exception as exc:  # noqa: BLE001 - a draft failure escalates
+            # The guarded draft already recorded the typed cause; the frontier
+            # model can still serve the request, so the run continues.
+            self.draft_failures += 1
+            self.last_draft_error = str(exc)
+            logger.warning("Cascade: draft call failed, escalating to frontier: %s", exc)
+            draft_text = ""
+        if draft_text and self._draft_is_acceptable(draft_text):
             logger.debug(
                 "Cascade: draft accepted (provider=%s, %d chars)",
                 self.draft.provider_name,
@@ -808,8 +818,24 @@ _PROVIDER_MAP: dict[str, type] = {
 }
 
 
-def _build_single_provider(config: dict[str, Any]) -> LLMProvider:
-    """Instantiate one non-cascade provider from a config dict."""
+def _build_single_provider(config: dict[str, Any], role: str = "primary") -> LLMProvider:
+    """Instantiate one non-cascade provider for ``role`` from a config dict.
+
+    Non-mock providers are returned inside a ``GuardedProvider`` so failed
+    calls raise typed ``ProviderCallError``s attributed to the role.
+    """
+    from factorminer.agent.provider_config import GuardedProvider, resolve_credential
+
+    provider = _build_raw_provider(config, role)
+    if isinstance(provider, MockProvider):
+        return provider
+    credential = resolve_credential(role, str(config.get("provider", "mock")), config)
+    return GuardedProvider(provider, role=role, credential=credential)
+
+
+def _build_raw_provider(config: dict[str, Any], role: str) -> LLMProvider:
+    from factorminer.agent.provider_config import resolve_credential
+
     provider_name = config.get("provider", "mock")
     cls = _PROVIDER_MAP.get(provider_name)
     if cls is None:
@@ -838,18 +864,16 @@ def _build_single_provider(config: dict[str, Any]) -> LLMProvider:
             )
         kwargs["base_url"] = base_url
         # Never pull OPENAI_API_KEY — only an explicit local key.
-        if "api_key" in config and config["api_key"]:
-            kwargs["api_key"] = config["api_key"]
-        else:
-            kwargs["api_key"] = config.get("local_api_key", "local")
+        kwargs["api_key"] = resolve_credential(role, provider_name, config).api_key
         if "timeout_s" in config:
             kwargs["timeout_s"] = config["timeout_s"]
         kwargs["prompt_cache"] = bool(config.get("prompt_cache", False))
         return cls(**kwargs)
 
-    # Official hosted providers
-    if "api_key" in config and config["api_key"]:
-        kwargs["api_key"] = config["api_key"]
+    # Official hosted providers: each role resolves its own credential.
+    credential = resolve_credential(role, provider_name, config)
+    if credential.api_key:
+        kwargs["api_key"] = credential.api_key
     kwargs["prompt_cache"] = prompt_cache
     if provider_name == "deepseek":
         kwargs["timeout_s"] = float(config.get("timeout_s", 120.0))
@@ -928,23 +952,24 @@ def create_provider(config: dict[str, Any]) -> LLMProvider:
                 "draft_model",
                 cascade_cfg.get("model", "llama3.2"),
             ),
-            # SECURITY (SSRF): draft base_url only from local cascade YAML.
-            "base_url": cascade_cfg.get(
-                "draft_base_url",
-                cascade_cfg.get("base_url", "http://127.0.0.1:11434/v1"),
-            ),
-            # Explicit local key only — never the frontier api_key.
-            "api_key": cascade_cfg.get(
-                "draft_api_key",
-                cascade_cfg.get("local_api_key", "local"),
-            ),
+            # Draft credentials come only from the cascade block or draft/
+            # provider env vars; never from the frontier's explicit api_key.
+            "draft_api_key": cascade_cfg.get("draft_api_key"),
+            "local_api_key": cascade_cfg.get("local_api_key"),
             "timeout_s": cascade_cfg.get(
                 "timeout_s",
                 config.get("timeout_s", 60.0),
             ),
             "prompt_cache": False,
         }
-        draft = _build_single_provider(draft_cfg)
+        if draft_provider in ("openai_compatible", "local"):
+            # SECURITY (SSRF): draft base_url only from local cascade YAML.
+            # Hosted draft providers use their own fixed endpoints.
+            draft_cfg["base_url"] = cascade_cfg.get(
+                "draft_base_url",
+                cascade_cfg.get("base_url", "http://127.0.0.1:11434/v1"),
+            )
+        draft = _build_single_provider(draft_cfg, role="draft")
         escalate = bool(cascade_cfg.get("escalate_on_parse_failure", True))
         logger.info(
             "Creating cascade provider: draft=%s frontier=%s",

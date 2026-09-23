@@ -248,7 +248,8 @@ def test_create_provider_cascade_from_config():
         }
     )
     assert isinstance(provider, CascadeProvider)
-    assert isinstance(provider.draft, OpenAICompatibleProvider)
+    assert isinstance(provider.draft.inner, OpenAICompatibleProvider)
+    assert provider.draft.role == "draft"
     assert provider.draft.base_url == "http://127.0.0.1:9999/v1"
     # Must NOT forward a frontier env key — explicit local key only.
     assert provider.draft.api_key == "local-only-key"

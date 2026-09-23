@@ -168,6 +168,19 @@ strategies are explicit: `spearman`, `pearson`, or `distance_correlation`.
 Optional diagnostics include significance, CPCV/PBO, decay, causal checks,
 crowding, capacity, portfolios, sensitivity, and model-risk evidence.
 
+Every non-mock provider built by `create_provider` is a `GuardedProvider`. A
+failed call raises `ProviderCallError`, which carries the role (`primary` or
+`draft`), provider, model, kind, and whether it can be retried. The kinds are
+`auth`, `rate_limit`, `timeout`, `connection`, `bad_request`, `server`,
+`missing_dependency`, and `unknown`. A failed draft call in the cascade
+escalates to the primary model instead of failing the request. By default,
+frozen evaluation runs XGBoost selection in a child process
+(`benchmark/model_worker.py`). When lasso, stepwise, or XGBoost fails, crashes
+(for example on a signal), or times out, the selection is recorded as
+`status: "unavailable"` with its cause. `MethodResult` then lists it in
+`unavailable` with NaN metrics, so the benchmark continues and never reports a
+missing model as a measured zero.
+
 `benchmark.runtime` coordinates comparisons. Separate modules own contracts,
 provenance, datasets, mining-loop construction, frozen evaluation, statistics,
 speed measurements, and reports. The CLI and `scripts/run_phase2_benchmark.py`
