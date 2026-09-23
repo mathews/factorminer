@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
 
+from factorminer.core.expression_plan import compile_batch, compile_tree
 from factorminer.core.factor_library import Factor
 from factorminer.core.parser import try_parse
 from factorminer.data.tensor_builder import TargetSpec, compute_targets
@@ -354,8 +355,12 @@ def evaluate_factors(
     *,
     retain_splits: Sequence[str] | None = None,
     signal_dtype: str = "float64",
+    plan_batch_size: int = 16,
 ) -> list[FactorEvaluationArtifact]:
     """Recompute metrics on float64 signals, retaining only requested panels.
+
+    Formulas are compiled in chunks of ``plan_batch_size`` so subexpressions
+    shared within a chunk are evaluated once.
 
     With ``retain_splits=None`` the full panel and split views are retained for
     general analysis. Benchmark callers can request only the splits needed for
@@ -379,67 +384,110 @@ def evaluate_factors(
         else:
             selectors[split_name] = indices
 
-    for factor in factors:
-        artifact = FactorEvaluationArtifact(
-            factor_id=factor.id,
-            name=factor.name,
-            formula=factor.formula,
-            category=factor.category,
-            parse_ok=False,
-        )
-
-        tree = try_parse(factor.formula)
-        if tree is None:
-            artifact.error = "Parse failure"
-            artifacts.append(artifact)
-            continue
-
-        artifact.parse_ok = True
-
-        try:
-            signals = compute_tree_signals(
-                tree,
-                dataset.data_dict,
-                active_returns.shape,
-                signal_failure_policy=signal_failure_policy,
+    for start in range(0, len(factors), max(int(plan_batch_size), 1)):
+        chunk = factors[start : start + max(int(plan_batch_size), 1)]
+        chunk_artifacts: list[FactorEvaluationArtifact] = []
+        parsed: list[tuple[FactorEvaluationArtifact, object]] = []
+        for factor in chunk:
+            artifact = FactorEvaluationArtifact(
+                factor_id=factor.id,
+                name=factor.name,
+                formula=factor.formula,
+                category=factor.category,
+                parse_ok=False,
             )
-        except Exception as exc:
-            artifact.error = str(exc)
-            artifacts.append(artifact)
-            continue
+            chunk_artifacts.append(artifact)
+            tree = try_parse(factor.formula)
+            if tree is None:
+                artifact.error = "Parse failure"
+                continue
+            artifact.parse_ok = True
+            parsed.append((artifact, tree))
 
-        if signals is None or np.all(np.isnan(signals)):
-            artifact.error = "Signal computation produced only NaN values"
-            artifacts.append(artifact)
-            continue
-
-        signals = np.asarray(signals, dtype=np.float64)
-        artifact.signals_computed = True
-        if requested is None:
-            artifact.signals_full = signals
-
-        for split_name, split in dataset.splits.items():
-            split_signals = signals[:, selectors[split_name]]
-            if requested is None:
-                artifact.split_signals[split_name] = split_signals
-            elif split_name in requested:
-                artifact.split_signals[split_name] = np.array(
-                    split_signals, dtype=dtype, copy=True, order="C"
-                )
-            active_split_target = split.get_target(active_target_name)
-            active_stats = compute_factor_stats(split_signals, active_split_target)
-            artifact.split_stats[split_name] = active_stats
-            artifact.target_stats[split_name] = {}
-            for available_target_name, split_target in split.target_returns.items():
-                artifact.target_stats[split_name][available_target_name] = (
-                    active_stats
-                    if available_target_name == active_target_name
-                    else compute_factor_stats(split_signals, split_target)
-                )
-
-        artifacts.append(artifact)
+        outcomes = compute_batch_signals(
+            [tree for _, tree in parsed],
+            dataset.data_dict,
+            active_returns.shape,
+            signal_failure_policy=signal_failure_policy,
+        )
+        for index, signals, error in outcomes:
+            artifact = parsed[index][0]
+            if error is not None:
+                artifact.error = str(error)
+                continue
+            _record_split_signals(
+                artifact,
+                signals,
+                dataset,
+                selectors=selectors,
+                requested=requested,
+                dtype=dtype,
+                active_target_name=active_target_name,
+            )
+        artifacts.extend(chunk_artifacts)
 
     return artifacts
+
+
+def _record_split_signals(
+    artifact: FactorEvaluationArtifact,
+    signals: np.ndarray,
+    dataset: EvaluationDataset,
+    *,
+    selectors: Mapping[str, slice | np.ndarray],
+    requested: set[str] | None,
+    dtype: np.dtype,
+    active_target_name: str,
+) -> None:
+    artifact.signals_computed = True
+    if requested is None:
+        artifact.signals_full = signals
+
+    for split_name, split in dataset.splits.items():
+        split_signals = signals[:, selectors[split_name]]
+        if requested is None:
+            artifact.split_signals[split_name] = split_signals
+        elif split_name in requested:
+            artifact.split_signals[split_name] = np.array(
+                split_signals, dtype=dtype, copy=True, order="C"
+            )
+        active_split_target = split.get_target(active_target_name)
+        active_stats = compute_factor_stats(split_signals, active_split_target)
+        artifact.split_stats[split_name] = active_stats
+        artifact.target_stats[split_name] = {}
+        for available_target_name, split_target in split.target_returns.items():
+            artifact.target_stats[split_name][available_target_name] = (
+                active_stats
+                if available_target_name == active_target_name
+                else compute_factor_stats(split_signals, split_target)
+            )
+
+
+def compute_batch_signals(
+    trees: Sequence,
+    data_dict: Mapping[str, np.ndarray],
+    returns_shape: tuple[int, int],
+    signal_failure_policy: str = "reject",
+) -> Iterator[tuple[int, np.ndarray | None, Exception | None]]:
+    """Evaluate trees through one shared plan, yielding per-formula outcomes.
+
+    Each item is ``(index, signals, None)`` or ``(index, None, error)`` where
+    ``error`` is what :func:`compute_tree_signals` would have raised for that
+    tree alone. Shared subexpressions are evaluated once and released after
+    their last consumer.
+    """
+    if not trees:
+        return
+    batch = compile_batch(trees)
+    for index, value in batch.iter_outputs(data_dict):
+        try:
+            signals = _finalize_signals(
+                trees[index].to_string(), value, returns_shape, signal_failure_policy
+            )
+        except Exception as exc:  # noqa: BLE001 - reported per formula
+            yield index, None, exc
+            continue
+        yield index, signals, None
 
 
 def compute_tree_signals(
@@ -449,19 +497,28 @@ def compute_tree_signals(
     signal_failure_policy: str = "reject",
 ) -> np.ndarray:
     """Evaluate an expression tree under an explicit failure policy."""
-    formula_str = tree.to_string()
-
     try:
-        signals = tree.evaluate(data_dict)
-    except Exception as exc:
+        value: np.ndarray | BaseException = compile_tree(tree).evaluate(data_dict)
+    except Exception as exc:  # noqa: BLE001 - resolved by the failure policy
+        value = exc
+    return _finalize_signals(tree.to_string(), value, returns_shape, signal_failure_policy)
+
+
+def _finalize_signals(
+    formula_str: str,
+    value: np.ndarray | BaseException | None,
+    returns_shape: tuple[int, int],
+    signal_failure_policy: str,
+) -> np.ndarray:
+    if isinstance(value, BaseException):
         return _handle_signal_failure(
             formula_str=formula_str,
             returns_shape=returns_shape,
             signal_failure_policy=signal_failure_policy,
-            cause=exc,
+            cause=value,
         )
 
-    if signals is None or np.all(np.isnan(signals)):
+    if value is None or np.all(np.isnan(value)):
         return _handle_signal_failure(
             formula_str=formula_str,
             returns_shape=returns_shape,
@@ -469,7 +526,7 @@ def compute_tree_signals(
             cause=SignalComputationError("Signal computation produced only NaN values"),
         )
 
-    return np.asarray(signals, dtype=np.float64)
+    return np.asarray(value, dtype=np.float64)
 
 
 def compute_correlation_matrix(

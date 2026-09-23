@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -17,7 +17,11 @@ from factorminer.evaluation.research import (
     compute_factor_geometry,
     passes_research_admission,
 )
-from factorminer.evaluation.runtime import SignalComputationError, compute_tree_signals
+from factorminer.evaluation.runtime import (
+    SignalComputationError,
+    compute_batch_signals,
+    compute_tree_signals,
+)
 
 # Optional reward-hook type. Kept as a loose Callable to avoid a hard import
 # cycle with ``rft_export`` (which itself may call into the kernel). A future
@@ -75,6 +79,36 @@ class EvaluationKernel:
             signal_failure_policy=signal_failure_policy or self.protocol.signal_failure_policy,
         )
         return tree, np.asarray(signals, dtype=np.float64)
+
+    def compute_batch_signals(
+        self,
+        *,
+        formulas: Sequence[str],
+        data_dict: dict[str, np.ndarray],
+        returns_shape: tuple[int, int],
+        signal_failure_policy: str | None = None,
+    ) -> list[tuple[Any, np.ndarray | None, Exception | None]]:
+        """Compute signals for several formulas through one shared plan.
+
+        Returns ``(tree, signals, error)`` per formula, in input order, where
+        ``error`` is what :meth:`compute_signals` would raise for that formula.
+        Subexpressions shared by the batch are evaluated once.
+        """
+        trees = [try_parse(formula) for formula in formulas]
+        outcomes: list[tuple[Any, np.ndarray | None, Exception | None]] = [
+            (None, None, SignalComputationError(f"Parse failure for '{formula}'"))
+            for formula in formulas
+        ]
+        parsed = [index for index, tree in enumerate(trees) if tree is not None]
+        for local_index, signals, error in compute_batch_signals(
+            [trees[index] for index in parsed],
+            data_dict,
+            returns_shape,
+            signal_failure_policy=signal_failure_policy or self.protocol.signal_failure_policy,
+        ):
+            index = parsed[local_index]
+            outcomes[index] = (trees[index], signals, error)
+        return outcomes
 
     def compute_target_stats(
         self,

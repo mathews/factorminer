@@ -124,6 +124,8 @@ class ValidationPipeline:
         name: str,
         formula: str,
         fast_screen: bool = True,
+        *,
+        precomputed: tuple[np.ndarray | None, Exception | None] | None = None,
     ) -> EvaluationResult:
         """Evaluate a single candidate through the full pipeline.
 
@@ -135,16 +137,23 @@ class ValidationPipeline:
             DSL formula string.
         fast_screen : bool
             If True, Stage 1 uses M_fast assets only.  If False, uses all.
+        precomputed : tuple, optional
+            ``(signals, error)`` from :meth:`EvaluationKernel.compute_batch_signals`.
         """
         result = EvaluationResult(factor_name=name, formula=formula)
 
         try:
-            _tree, signals = self.kernel.compute_signals(
-                formula=formula,
-                data_dict=self._build_data_dict(),
-                returns_shape=self.returns.shape,
-                signal_failure_policy=self.signal_failure_policy,
-            )
+            if precomputed is None:
+                _tree, signals = self.kernel.compute_signals(
+                    formula=formula,
+                    data_dict=self._build_data_dict(),
+                    returns_shape=self.returns.shape,
+                    signal_failure_policy=self.signal_failure_policy,
+                )
+            else:
+                signals, error = precomputed
+                if error is not None:
+                    raise error
         except SignalComputationError as exc:
             if "Parse failure" in str(exc):
                 result.rejection_reason = "Parse failure"
@@ -332,21 +341,58 @@ class ValidationPipeline:
         Stage 1-2.5 are run per-candidate (optionally in parallel).
         Stage 3 (dedup) runs on all admitted candidates together.
         """
+        signals = self._batch_signals([formula for _, formula in candidates])
+
         # Stage 1 + 2 + 2.5: per-candidate evaluation
         if self.num_workers > 1:
-            results = self._evaluate_parallel(candidates)
+            results = self._evaluate_parallel(candidates, signals)
         else:
-            results = []
-            for name, formula in candidates:
-                result = self.evaluate_candidate(name, formula)
-                results.append(result)
+            results = [
+                self.evaluate_candidate(name, formula, precomputed=precomputed)
+                for (name, formula), precomputed in zip(candidates, signals, strict=True)
+            ]
 
         # Stage 3: Intra-batch deduplication
         results = self._deduplicate_batch(results)
 
         return results
 
-    def _evaluate_parallel(self, candidates: list[tuple[str, str]]) -> list[EvaluationResult]:
+    def _batch_signals(
+        self, formulas: list[str]
+    ) -> list[tuple[np.ndarray | None, Exception | None]]:
+        """Compute candidate signals through shared compiled plans.
+
+        Each worker evaluates one contiguous chunk as a single plan, so repeated
+        subexpressions within a chunk are evaluated once.
+        """
+        from concurrent.futures import ThreadPoolExecutor
+
+        data_dict = self._build_data_dict()
+
+        def compute(chunk: list[str]) -> list[tuple[np.ndarray | None, Exception | None]]:
+            return [
+                (signals, error)
+                for _tree, signals, error in self.kernel.compute_batch_signals(
+                    formulas=chunk,
+                    data_dict=data_dict,
+                    returns_shape=self.returns.shape,
+                    signal_failure_policy=self.signal_failure_policy,
+                )
+            ]
+
+        workers = min(max(self.num_workers, 1), len(formulas))
+        if workers <= 1:
+            return compute(formulas)
+        size = -(-len(formulas) // workers)
+        chunks = [formulas[start : start + size] for start in range(0, len(formulas), size)]
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            return [item for chunk in pool.map(compute, chunks) for item in chunk]
+
+    def _evaluate_parallel(
+        self,
+        candidates: list[tuple[str, str]],
+        signals: list[tuple[np.ndarray | None, Exception | None]],
+    ) -> list[EvaluationResult]:
         """Evaluate candidates using a thread pool.
 
         Note: uses threads rather than processes because signals arrays
@@ -357,7 +403,7 @@ class ValidationPipeline:
         results: list[EvaluationResult | None] = [None] * len(candidates)
 
         def _eval(idx: int, name: str, formula: str) -> tuple[int, EvaluationResult]:
-            return idx, self.evaluate_candidate(name, formula)
+            return idx, self.evaluate_candidate(name, formula, precomputed=signals[idx])
 
         with ThreadPoolExecutor(max_workers=self.num_workers) as pool:
             futures = [

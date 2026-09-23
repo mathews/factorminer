@@ -70,6 +70,20 @@ Registered leaves include `$open`, `$high`, `$low`, `$close`, `$volume`, `$amt`,
 fundamentals or futures fields. The parser builds expression trees evaluated on
 NumPy arrays by the shared signal runtime.
 
+The runtime compiles trees into immutable `ExpressionPlan`s
+(`core/expression_plan.py`). A plan lists the deduplicated operator steps in
+order, the required features, the lookback, whether the formula needs a whole
+cross-section, and a formula digest that includes `OPERATOR_SEMANTICS_VERSION`.
+Mining batches and benchmark chunks (`plan_batch_size`) are compiled into a
+`BatchPlan`, so each shared subexpression is evaluated once and released after
+its last consumer. Each step runs the same operator code as recursive
+evaluation, so outputs, NaNs, ties, warm-up values, and error messages are
+unchanged. A step failure reaches only the formulas that depend on it.
+`max_lookback` is the number of prior periods that can affect a value, and it
+is `None` for recursive or cumulative operators. A time tile must add this
+lookback before its first period. Cross-sectional operators need every asset
+at each period.
+
 ### Numerical backends
 
 `evaluation.backend: gpu` accelerates candidate-to-library Spearman correlation
