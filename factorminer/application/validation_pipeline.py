@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from concurrent.futures import as_completed
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import numpy as np
@@ -12,6 +12,7 @@ from factorminer.application.mining_budget import EvaluationResult
 from factorminer.architecture import EvaluationKernel, LibraryGeometry, PaperProtocol
 from factorminer.core.factor_library import FactorLibrary
 from factorminer.core.types import get_features
+from factorminer.evaluation.dependence_index import indexed_dependence_metric
 from factorminer.evaluation.metrics import compute_factor_stats
 from factorminer.evaluation.runtime import SignalComputationError, compute_tree_signals
 
@@ -48,15 +49,19 @@ class ValidationPipeline:
         benchmark_mode: str = "paper",
         redundancy_metric: str = "spearman",
         evaluation_kernel: EvaluationKernel | None = None,
+        default_target: str = "paper",
     ) -> None:
         self.data_tensor = data_tensor  # (M, T, F)
         self.returns = returns  # (M, T)
-        self.target_panels = target_panels or {"paper": returns}
-        self.target_horizons = target_horizons or {"paper": 1}
+        self.default_target = default_target
+        self.target_panels = target_panels or {default_target: returns}
+        if default_target not in self.target_panels:
+            raise ValueError(f"Default target {default_target!r} is missing from target_panels")
+        self.target_horizons = target_horizons or {default_target: 1}
         self.library = library or FactorLibrary(
             correlation_threshold=0.5,
             ic_threshold=ic_threshold,
-            dependence_metric=redundancy_metric,
+            dependence_metric=indexed_dependence_metric(redundancy_metric),
         )
         self.ic_threshold = ic_threshold
         self.icir_threshold = icir_threshold
@@ -79,7 +84,7 @@ class ValidationPipeline:
                 "replacement_ic_ratio": replacement_ic_ratio,
             },
         )()
-        protocol_cfg.data = type("DataCfg", (), {"default_target": "paper", "targets": []})()
+        protocol_cfg.data = type("DataCfg", (), {"default_target": default_target, "targets": []})()
         protocol_cfg.benchmark = type(
             "BenchCfg",
             (),
@@ -120,6 +125,8 @@ class ValidationPipeline:
         name: str,
         formula: str,
         fast_screen: bool = True,
+        *,
+        precomputed: tuple[np.ndarray | None, Exception | None] | None = None,
     ) -> EvaluationResult:
         """Evaluate a single candidate through the full pipeline.
 
@@ -131,16 +138,23 @@ class ValidationPipeline:
             DSL formula string.
         fast_screen : bool
             If True, Stage 1 uses M_fast assets only.  If False, uses all.
+        precomputed : tuple, optional
+            ``(signals, error)`` from :meth:`EvaluationKernel.compute_batch_signals`.
         """
         result = EvaluationResult(factor_name=name, formula=formula)
 
         try:
-            _tree, signals = self.kernel.compute_signals(
-                formula=formula,
-                data_dict=self._build_data_dict(),
-                returns_shape=self.returns.shape,
-                signal_failure_policy=self.signal_failure_policy,
-            )
+            if precomputed is None:
+                _tree, signals = self.kernel.compute_signals(
+                    formula=formula,
+                    data_dict=self._build_data_dict(),
+                    returns_shape=self.returns.shape,
+                    signal_failure_policy=self.signal_failure_policy,
+                )
+            else:
+                signals, error = precomputed
+                if error is not None:
+                    raise error
         except SignalComputationError as exc:
             if "Parse failure" in str(exc):
                 result.rejection_reason = "Parse failure"
@@ -182,22 +196,13 @@ class ValidationPipeline:
             self.returns,
             self.target_panels,
         )
-
-        # logger.info(f"target_stats ~~ {result.target_stats}")
-        #
-
-        paper_stats = {}
-        if result.target_stats.get("paper") is not None:
-            paper_stats = result.target_stats["paper"]
-        elif result.target_stats.get("research") is not None:
-            paper_stats = result.target_stats["research"]
-
-        result.ic_mean = paper_stats["ic_mean"]
-        result.ic_paper_mean = paper_stats["ic_paper_mean"]
-        result.ic_abs_mean = paper_stats["ic_abs_mean"]
-        result.icir = paper_stats["icir"]
-        result.ic_paper_icir = paper_stats["ic_paper_icir"]
-        result.ic_win_rate = paper_stats["ic_win_rate"]
+        primary_stats = result.target_stats[self.default_target]
+        result.ic_mean = primary_stats["ic_mean"]
+        result.ic_paper_mean = primary_stats["ic_paper_mean"]
+        result.ic_abs_mean = primary_stats["ic_abs_mean"]
+        result.icir = primary_stats["icir"]
+        result.ic_paper_icir = primary_stats["ic_paper_icir"]
+        result.ic_win_rate = primary_stats["ic_win_rate"]
 
         quality = self.kernel.compute_quality_score(
             signals=signals,
@@ -337,42 +342,36 @@ class ValidationPipeline:
         Stage 1-2.5 are run per-candidate (optionally in parallel).
         Stage 3 (dedup) runs on all admitted candidates together.
         """
-        # Stage 1 + 2 + 2.5: per-candidate evaluation
-        if self.num_workers > 1:
-            results = self._evaluate_parallel(candidates)
+        if not candidates:
+            return []
+        data_dict = self._build_data_dict()
+        workers = min(max(self.num_workers, 1), len(candidates))
+        size = -(-len(candidates) // workers)
+        chunks = [candidates[start : start + size] for start in range(0, len(candidates), size)]
+
+        def evaluate_chunk(chunk: list[tuple[str, str]]) -> list[EvaluationResult]:
+            formulas = [formula for _, formula in chunk]
+            outcomes = self.kernel.iter_batch_signals(
+                formulas=formulas,
+                data_dict=data_dict,
+                returns_shape=self.returns.shape,
+                signal_failure_policy=self.signal_failure_policy,
+            )
+            return [
+                self.evaluate_candidate(name, formula, precomputed=(signals, error))
+                for (name, formula), (_tree, signals, error) in zip(chunk, outcomes, strict=True)
+            ]
+
+        if workers == 1:
+            results = evaluate_chunk(chunks[0])
         else:
-            results = []
-            for name, formula in candidates:
-                result = self.evaluate_candidate(name, formula)
-                results.append(result)
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                results = [result for chunk in pool.map(evaluate_chunk, chunks) for result in chunk]
 
         # Stage 3: Intra-batch deduplication
         results = self._deduplicate_batch(results)
 
         return results
-
-    def _evaluate_parallel(self, candidates: list[tuple[str, str]]) -> list[EvaluationResult]:
-        """Evaluate candidates using a thread pool.
-
-        Note: uses threads rather than processes because signals arrays
-        are large and sharing via processes would require serialization.
-        """
-        from concurrent.futures import ThreadPoolExecutor
-
-        results: list[EvaluationResult | None] = [None] * len(candidates)
-
-        def _eval(idx: int, name: str, formula: str) -> tuple[int, EvaluationResult]:
-            return idx, self.evaluate_candidate(name, formula)
-
-        with ThreadPoolExecutor(max_workers=self.num_workers) as pool:
-            futures = [
-                pool.submit(_eval, i, name, formula) for i, (name, formula) in enumerate(candidates)
-            ]
-            for future in as_completed(futures):
-                idx, result = future.result()
-                results[idx] = result
-
-        return [r for r in results if r is not None]
 
     def _deduplicate_batch(self, results: list[EvaluationResult]) -> list[EvaluationResult]:
         """Stage 3: Remove intra-batch duplicates among admitted candidates.

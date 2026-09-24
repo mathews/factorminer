@@ -560,7 +560,7 @@ def _split_row_counts_for_validation(report, cfg, hdf_key: str) -> dict[str, int
         return None
 
     try:
-        import pandas as pd
+        import pandas as pd  # type: ignore[import-untyped]
 
         from factorminer.data.validation import _read_raw_frame
 

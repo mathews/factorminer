@@ -137,11 +137,14 @@ def build_research_receipt(
     artifact_sha256s = {name: file_sha256(path) for name, path in artifact_inventory.items()}
 
     runtime_refs = list(phase2_manifest.get("runtime_manifest_refs", []))
-    baseline_provenance = {
-        str(ref.get("baseline") or f"runtime_{index}"): dict(ref.get("baseline_provenance") or {})
-        for index, ref in enumerate(runtime_refs)
-    }
-    factor_library_sha256 = stable_digest(
+    baseline_provenance = dict(phase2_manifest.get("baseline_provenance") or {})
+    if not baseline_provenance:
+        baseline_provenance = {
+            str(ref.get("baseline") or f"runtime_{index}"): dict(ref.get("baseline_provenance") or {})
+            for index, ref in enumerate(runtime_refs)
+        }
+    selected_factors = phase2_manifest.get("selected_factors")
+    factor_library_sha256 = stable_digest(selected_factors) if selected_factors is not None else stable_digest(
         {
             "runtime_manifests": [str(ref.get("sha256", "")) for ref in runtime_refs],
             "runtime_topk": artifact_sha256s.get("phase2/runtime_topk", ""),
@@ -256,6 +259,33 @@ def _rewrite_manifest_for_bundle(
     }
 
     generated_files: dict[Path, bytes] = {}
+    if portable.get("kind") == "benchmark_evidence":
+        for baseline in portable.get("baselines", []):
+            manifest_key = f"phase2/{baseline}_manifest"
+            result_key = f"phase2/{baseline}_result"
+            if manifest_key not in source_inventory or result_key not in source_inventory:
+                raise ValueError(f"benchmark evidence is missing {baseline} artifacts")
+            nested = json.loads(source_inventory[manifest_key].read_text())
+            if not isinstance(nested, dict):
+                raise ValueError(f"{baseline} manifest must contain a JSON object")
+            nested_path = destination_by_name[manifest_key]
+            nested["artifact_paths"] = {
+                "result": os.path.relpath(destination_by_name[result_key], nested_path.parent),
+                "manifest": nested_path.name,
+            }
+            generated_files[nested_path] = _json_bytes(nested)
+        qlib_key = "phase2/qlib_evidence"
+        if qlib_key in source_inventory:
+            qlib_spec = json.loads(source_inventory[qlib_key].read_text())
+            if not isinstance(qlib_spec, dict):
+                raise ValueError("Qlib evidence must contain a JSON object")
+            qlib_path = destination_by_name[qlib_key]
+            for field, artifact in (("values_path", "qlib_values"), ("metrics_path", "qlib_metrics")):
+                key = f"phase2/{artifact}"
+                if key not in destination_by_name:
+                    raise ValueError(f"Qlib evidence is missing {artifact}")
+                qlib_spec[field] = os.path.relpath(destination_by_name[key], qlib_path.parent)
+            generated_files[qlib_path] = _json_bytes(qlib_spec)
     source_refs = list(phase2_manifest.get("runtime_manifest_refs", []))
     portable_refs = list(portable.get("runtime_manifest_refs", []))
     for index, (source_ref, portable_ref) in enumerate(
@@ -343,6 +373,15 @@ def publish_portable_bundle(
     normalized_artifacts: dict[str, bytes] = {}
     if "phase2/manifest" in source_inventory:
         normalized_artifacts["phase2/manifest"] = manifest_bytes
+    if portable_manifest.get("kind") == "benchmark_evidence":
+        for baseline in portable_manifest.get("baselines", []):
+            name = f"phase2/{baseline}_manifest"
+            relative = _portable_artifact_path(name, source_inventory[name])
+            normalized_artifacts[name] = generated_files[relative]
+        qlib_name = "phase2/qlib_evidence"
+        if qlib_name in source_inventory:
+            relative = _portable_artifact_path(qlib_name, source_inventory[qlib_name])
+            normalized_artifacts[qlib_name] = generated_files[relative]
     for index, _ in enumerate(portable_manifest.get("runtime_manifest_refs", [])):
         name = f"runtime/{index}/manifest"
         generated_path = Path("manifests", f"runtime_{index}.json")
@@ -512,6 +551,8 @@ def verify_research_receipt(
     # artifact_sha256s is keyed by artifact NAME -> digest; paths live in the
     # referenced source_manifest, so re-open it to resolve each name to a path.
     source_manifest = payload.get("source_manifest") or {}
+    manifest_payload: dict[str, Any] = {}
+    inventory: dict[str, Path] = {}
     try:
         manifest_path = _resolve_bundle_path(source_manifest.get("path", ""), base_dir=release_dir)
     except ValueError as exc:
@@ -556,6 +597,11 @@ def verify_research_receipt(
             actual_digest = file_sha256(path)
             if actual_digest != expected_digest:
                 mismatches.append(f"artifact '{name}' hash changed: {path}")
+
+        if manifest_payload.get("kind") == "benchmark_evidence":
+            from factorminer.benchmark.qlib_runner import verify_qlib_receipt_artifacts
+
+            mismatches.extend(verify_qlib_receipt_artifacts(manifest_payload, inventory))
 
         for index, ref in enumerate(manifest_payload.get("runtime_manifest_refs", [])):
             try:
@@ -613,6 +659,17 @@ def verify_research_receipt(
                     mismatches.append(
                         "dataset_commitment: HMAC mismatch against supplied commitment-input"
                     )
+
+    qlib_payload = manifest_payload.get("qlib") or {}
+    if (manifest_payload.get("kind") == "benchmark_evidence"
+            and isinstance(qlib_payload, dict)
+            and qlib_payload.get("protocol") == "frozen_panel_qlib_ridge"
+            and (scheme == "none" or (commitment_input is not None and commitment_input.is_file()))):
+        from factorminer.benchmark.qlib_runner import verify_qlib_against_committed_input
+
+        mismatches.extend(verify_qlib_against_committed_input(
+            manifest_payload, inventory, None if scheme == "none" else commitment_input
+        ))
 
     return ReceiptVerificationResult(
         release_id=claimed_release_id, passed=not mismatches, mismatches=mismatches

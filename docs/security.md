@@ -34,6 +34,18 @@ not fall back to `OPENAI_API_KEY`. Frontier construction strips custom URLs;
 draft/frontier requests have independent timeouts. Generated content cannot
 select the endpoint.
 
+Primary and draft models resolve their credentials separately
+(`agent/provider_config.py`). The primary uses `llm.api_key` or its provider's
+environment variable. The draft uses `cascade.draft_api_key`, then
+`FACTORMINER_DRAFT_API_KEY`, then the hosted provider's own environment
+variable, and never inherits the primary's explicit key. Local engines receive
+only an explicit local key or the `local` placeholder. Hosted draft providers
+use their fixed endpoints and never the default local draft URL.
+
+Run manifests record each role's credential source and a 12-character SHA-256
+fingerprint, never the key itself. They also record call counts and recent
+typed failures under `model_providers`.
+
 Research notes enter generation through structured archetypes; memory and
 library retrieval uses typed summaries. Sealed-evaluator feedback exposes only
 allowed coarse fields. Malformed replies fail to neutral/rejected results, and

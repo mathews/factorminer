@@ -144,9 +144,7 @@ class MarketImpactModel:
         direction = np.asarray(direction, dtype=np.float64)
 
         # Participation rate: what fraction of ADV are we trading
-        # participation = np.where(adv > 0, trade_size / adv, 0.0)
-        participation = np.zeros_like(trade_size)
-        np.divide(trade_size, adv, out=participation, where=adv > 0)
+        participation = np.divide(trade_size, adv, out=np.zeros_like(trade_size), where=adv > 0)
 
         # Permanent impact: lambda * sigma * participation^alpha
         # Ref: Almgren (2001) eq. (2.4) – permanent impact g(v) = lambda * sigma * |x|^alpha

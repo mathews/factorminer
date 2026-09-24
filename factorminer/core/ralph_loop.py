@@ -40,6 +40,7 @@ from factorminer.application.research_actions import build_research_action_servi
 from factorminer.application.research_knowledge import ResearchKnowledgeStore
 from factorminer.application.run_artifacts import MiningArtifactService
 from factorminer.application.runtime_context import MiningRunContext, MiningSettings
+from factorminer.application.runtime_profile import RuntimeProfile
 from factorminer.application.validation_pipeline import ValidationPipeline
 from factorminer.architecture import (
     DatasetContract,
@@ -66,6 +67,7 @@ from factorminer.core.library_io import load_library, save_library
 from factorminer.core.loop_services import LoopExecutionService
 from factorminer.core.provenance import infer_parent_lineage, stable_digest
 from factorminer.core.session import MiningSession
+from factorminer.evaluation.dependence_index import indexed_dependence_metric
 from factorminer.memory.defaults import create_default_memory
 from factorminer.memory.memory_store import ExperienceMemory
 from factorminer.utils.logging import MiningSessionLogger
@@ -140,7 +142,7 @@ class RalphLoop:
         self.library = library or FactorLibrary(
             correlation_threshold=self.settings.correlation_threshold,
             ic_threshold=self.settings.ic_threshold,
-            dependence_metric=self.settings.redundancy_metric,
+            dependence_metric=indexed_dependence_metric(self.settings.redundancy_metric),
         )
         self.geometry = LibraryGeometry(self.library)
         self.admission_service = FactorAdmissionService(self.library)
@@ -206,12 +208,14 @@ class RalphLoop:
             benchmark_mode=self.settings.benchmark_mode,
             redundancy_metric=self.settings.redundancy_metric,
             evaluation_kernel=self.evaluation_kernel,
+            default_target=self.dataset_contract.default_target,
         )
         self.pipeline.signal_failure_policy = self.settings.signal_failure_policy
         self.reporter = MiningReporter(self.settings.output_dir)
         self.budget = BudgetTracker()
         self.research_actions = build_research_action_service(self)
         self.signal_failure_policy = self.settings.signal_failure_policy
+        self.runtime_profile = RuntimeProfile()
         self._loop_services = LoopExecutionService(self)
         self._artifact_service = MiningArtifactService(self)
 
@@ -307,6 +311,7 @@ class RalphLoop:
         )
         self._run_manifest["paper_protocol"] = self.protocol.runtime_contract()
         self._run_manifest["dataset_contract"] = self.dataset_contract.to_dict()
+        self._run_manifest["dataset_replay_identity"] = self.dataset_contract.replay_identity()
         self._run_manifest["trial_accounting"] = {
             "schema_version": "factor-trial-ledger-v1",
             "campaign_id": self.trial_campaign_id,

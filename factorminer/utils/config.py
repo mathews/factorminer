@@ -20,7 +20,9 @@ class MiningConfig:
 
     target_library_size: int = 110
     batch_size: int = 40
-    max_iterations: int = 0  # No automatic iteration ceiling; positive values are explicit run boundaries.
+    max_iterations: int = (
+        0  # No automatic iteration ceiling; positive values are explicit run boundaries.
+    )
     ic_threshold: float = 0.04
     icir_threshold: float = 0.5
     correlation_threshold: float = 0.5
@@ -56,11 +58,8 @@ class EvaluationConfig:
     backend: str = "numpy"
     redundancy_metric: str = "spearman"
     signal_failure_policy: str = "reject"
-    # Storage dtype for recomputed factor signal panels. "float64" is the
-    # historical (exact) default; "float32" halves the benchmark memory
-    # footprint, which matters from CSI500 upwards. IC/ICIR statistics are
-    # unaffected at reporting precision.
     signal_dtype: str = "float64"
+    signal_cache_mb: float | None = None
 
     def validate(self) -> None:
         if self.num_workers < 1:
@@ -74,12 +73,11 @@ class EvaluationConfig:
                 "redundancy_metric must be one of: spearman, pearson, distance_correlation"
             )
         if self.signal_failure_policy not in ("reject", "synthetic", "raise"):
-            raise ValueError(
-                "signal_failure_policy must be one of: reject, synthetic, raise"
-            )
-        if self.signal_dtype not in ("float64", "float32"):
-            raise ValueError(f"signal_dtype must be float64 or float32 (got "
-                             f"'{self.signal_dtype}')")
+            raise ValueError("signal_failure_policy must be one of: reject, synthetic, raise")
+        if self.signal_dtype not in ("float32", "float64"):
+            raise ValueError("signal_dtype must be float32 or float64")
+        if self.signal_cache_mb is not None and self.signal_cache_mb < 0:
+            raise ValueError("signal_cache_mb must be >= 0")
 
 
 @dataclass
@@ -94,19 +92,21 @@ class DataConfig:
     frequency: str = "10min"
     features: list[str] = field(
         default_factory=lambda: [
-            "$open", "$high", "$low", "$close",
-            "$volume", "$amt", "$vwap", "$returns",
+            "$open",
+            "$high",
+            "$low",
+            "$close",
+            "$volume",
+            "$amt",
+            "$vwap",
+            "$returns",
         ]
     )
-    train_period: list[str] = field(
-        default_factory=lambda: ["2024-01-01", "2024-12-31"]
-    )
+    train_period: list[str] = field(default_factory=lambda: ["2024-01-01", "2024-12-31"])
     validation_period: list[str] = field(default_factory=list)
     purge_bars: int = 0
     embargo_bars: int = 0
-    test_period: list[str] = field(
-        default_factory=lambda: ["2025-01-01", "2025-12-31"]
-    )
+    test_period: list[str] = field(default_factory=lambda: ["2025-01-01", "2025-12-31"])
     targets: list[dict[str, Any]] = field(
         default_factory=lambda: [
             {
@@ -119,8 +119,29 @@ class DataConfig:
         ]
     )
     default_target: str = "paper"
+    # Declared data provenance (see DatasetContract). Undeclared values keep
+    # historical campaign identity unchanged.
+    source_version: str = ""
+    availability: str = "unspecified"
+    availability_lag_bars: int = 0
+    universe_policy: str = "unspecified"
+    adjustment_policy: str = "unspecified"
 
     def validate(self) -> None:
+        from factorminer.architecture.dataset_contract import (
+            ADJUSTMENT_POLICIES,
+            AVAILABILITY_POLICIES,
+            UNIVERSE_POLICIES,
+        )
+
+        if self.availability not in AVAILABILITY_POLICIES:
+            raise ValueError(f"data.availability must be one of {sorted(AVAILABILITY_POLICIES)}")
+        if self.universe_policy not in UNIVERSE_POLICIES:
+            raise ValueError(f"data.universe_policy must be one of {sorted(UNIVERSE_POLICIES)}")
+        if self.adjustment_policy not in ADJUSTMENT_POLICIES:
+            raise ValueError(f"data.adjustment_policy must be one of {sorted(ADJUSTMENT_POLICIES)}")
+        if self.availability_lag_bars < 0:
+            raise ValueError("data.availability_lag_bars must be >= 0")
         if len(self.train_period) != 2:
             raise ValueError("train_period must be a list of [start, end]")
         if self.validation_period and len(self.validation_period) != 2:
@@ -204,8 +225,7 @@ class LLMConfig:
         )
         if self.provider not in allowed:
             raise ValueError(
-                f"provider must be one of: {', '.join(allowed)} "
-                f"(got '{self.provider}')"
+                f"provider must be one of: {', '.join(allowed)} (got '{self.provider}')"
             )
         if not (0.0 <= self.temperature <= 2.0):
             raise ValueError("temperature must be in [0, 2]")
@@ -330,9 +350,7 @@ class CapacityConfig:
 
     enabled: bool = False
     base_capital_usd: float = 1e8
-    capacity_levels: list[float] = field(
-        default_factory=lambda: [1e7, 5e7, 1e8, 5e8, 1e9]
-    )
+    capacity_levels: list[float] = field(default_factory=lambda: [1e7, 5e7, 1e8, 5e8, 1e9])
     ic_degradation_limit: float = 0.20
     net_icir_threshold: float = 0.3
     sigma_annual: float = 0.25
@@ -580,9 +598,7 @@ class ResearchAdmissionConfig:
 class ResearchSelectionConfig:
     """Research-mode model configuration."""
 
-    models: list[str] = field(
-        default_factory=lambda: ["ridge", "elastic_net", "lasso", "xgboost"]
-    )
+    models: list[str] = field(default_factory=lambda: ["ridge", "elastic_net", "lasso", "xgboost"])
     rolling_train_window: int = 80
     rolling_test_window: int = 20
     rolling_step: int = 20
@@ -673,9 +689,7 @@ class ResearchConfig:
                 "single_horizon, weighted_multi_horizon, pareto_multi_horizon, net_ir"
             )
         if self.target_aggregation not in ("weighted", "pareto"):
-            raise ValueError(
-                "research.target_aggregation must be one of: weighted, pareto"
-            )
+            raise ValueError("research.target_aggregation must be one of: weighted, pareto")
         if any(weight < 0.0 for weight in self.horizon_weights.values()):
             raise ValueError("research.horizon_weights values must be >= 0")
         self.uncertainty.validate()

@@ -23,6 +23,7 @@ from factorminer.benchmark.catalogs import (
 )
 from factorminer.core.factor_library import Factor, FactorLibrary
 from factorminer.core.library_io import load_library
+from factorminer.evaluation.dependence_index import indexed_dependence_metric
 from factorminer.evaluation.runtime import (
     EvaluationDataset,
     FactorEvaluationArtifact,
@@ -188,7 +189,9 @@ def build_benchmark_library(
     library = FactorLibrary(
         correlation_threshold=correlation_threshold,
         ic_threshold=ic_threshold,
-        dependence_metric=getattr(cfg.evaluation, "redundancy_metric", "spearman"),
+        dependence_metric=indexed_dependence_metric(
+            getattr(cfg.evaluation, "redundancy_metric", "spearman")
+        ),
     )
 
     stats = {

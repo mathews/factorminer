@@ -70,6 +70,35 @@ Registered leaves include `$open`, `$high`, `$low`, `$close`, `$volume`, `$amt`,
 fundamentals or futures fields. The parser builds expression trees evaluated on
 NumPy arrays by the shared signal runtime.
 
+The runtime compiles trees into immutable `ExpressionPlan`s
+(`core/expression_plan.py`). A plan lists the deduplicated operator steps in
+order, the required features, the lookback, whether the formula needs a whole
+cross-section, and a formula digest that includes `OPERATOR_SEMANTICS_VERSION`.
+Mining batches and benchmark chunks (`plan_batch_size`) are compiled into a
+`BatchPlan`, so each shared subexpression is evaluated once and released after
+its last consumer. Each step runs the same operator code as recursive
+evaluation, so outputs, NaNs, ties, warm-up values, and error messages are
+unchanged. A step failure reaches only the formulas that depend on it.
+`max_lookback` is the number of prior periods that can affect a value, and it
+is `None` for recursive or cumulative operators. A time tile must add this
+lookback before its first period. Cross-sectional operators need every asset
+at each period.
+
+Retained signal panels are identified by a `SignalKey`, which records the
+dataset fingerprint, formula digest, operator semantics version, backend, and
+dtype (`domain/signal_ref.py`). When `evaluation.signal_cache_mb` is set,
+benchmark freezing and frozen evaluation store retained splits in a
+`SplitSignalStore` (`evaluation/signal_store.py`). Artifacts then hold a
+`SignalRef` whose `split_signals` mapping reads through the store. Panels
+beyond the resident budget spill least-recently-used to temporary `.npy` files
+and are read back exactly through read-only memory maps. A duplicate formula
+shares one stored panel. `release_signals()` frees the panel but keeps the
+scores and the key. Resident memory can exceed the budget by at most one
+formula's retained splits while it is being stored. Admitted library factors
+still hold their own signals for dependence checks. Table 1 results record
+store statistics under `signal_cache`. When `signal_cache_mb` is unset, every
+retained panel stays in memory, as before.
+
 ### Numerical backends
 
 `evaluation.backend: gpu` accelerates candidate-to-library Spearman correlation
@@ -94,6 +123,19 @@ row order on both backends. This can change historical tied-rank results.
 Candidate/library correlation instead uses average tied ranks and ranks each
 column before masking paired observations. Dates with fewer than five paired
 ranks are skipped; constant ranks contribute zero on otherwise usable dates.
+
+Mining and benchmark libraries built with the `spearman` metric use
+`IndexedSpearmanMetric` (`evaluation/dependence_index.py`). It returns the same
+values as `SpearmanDependenceMetric`, bit for bit. Each signal is ranked once
+per period. A pair re-ranks only the periods where a signal's own NaN mask
+differs from the pair's joint mask. Chunking, memory layout, and reductions
+match the reference. Pair results are cached, so admission, replacement,
+diagnostics, and the library correlation matrix compute each pair only once.
+The index identifies signals by object identity and marks them read-only. It
+drops entries when arrays are garbage-collected and bounds prepared ranks to
+512 MiB (least recently used first). Run manifests report its hit counts under
+`runtime_profile.dependence_index`. Pearson and distance correlation are
+unchanged.
 
 ## Memory and research knowledge
 
@@ -125,6 +167,19 @@ Analysis recomputes formulas on the requested panel and split. Dependence
 strategies are explicit: `spearman`, `pearson`, or `distance_correlation`.
 Optional diagnostics include significance, CPCV/PBO, decay, causal checks,
 crowding, capacity, portfolios, sensitivity, and model-risk evidence.
+
+Every non-mock provider built by `create_provider` is a `GuardedProvider`. A
+failed call raises `ProviderCallError`, which carries the role (`primary` or
+`draft`), provider, model, kind, and whether it can be retried. The kinds are
+`auth`, `rate_limit`, `timeout`, `connection`, `bad_request`, `server`,
+`missing_dependency`, and `unknown`. A failed draft call in the cascade
+escalates to the primary model instead of failing the request. By default,
+frozen evaluation runs XGBoost selection in a child process
+(`benchmark/model_worker.py`). When lasso, stepwise, or XGBoost fails, crashes
+(for example on a signal), or times out, the selection is recorded as
+`status: "unavailable"` with its cause. `MethodResult` then lists it in
+`unavailable` with NaN metrics, so the benchmark continues and never reports a
+missing model as a measured zero.
 
 `benchmark.runtime` coordinates comparisons. Separate modules own contracts,
 provenance, datasets, mining-loop construction, frozen evaluation, statistics,

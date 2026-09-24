@@ -27,7 +27,7 @@ from contextlib import contextmanager
 from typing import Any
 
 import numpy as np
-import pandas as pd
+import pandas as pd  # type: ignore[import-untyped]
 
 import factorminer.core.helix_loop as helix_loop_module
 import factorminer.core.ralph_loop as ralph_loop_module
@@ -43,6 +43,8 @@ from factorminer.benchmark.speed import _build_mock_data_dict
 from factorminer.benchmark.statistics import (
     AblationResult,
     MethodResult,
+    selection_metric,
+    unavailable_selections,
 )
 from factorminer.core.factor_library import FactorLibrary
 from factorminer.core.helix_loop import HelixLoop
@@ -323,10 +325,11 @@ def _runtime_payload_to_result(
         ew_icir=float(combinations.get("equal_weight", {}).get("icir", 0.0)),
         icw_ic=float(combinations.get("ic_weighted", {}).get("ic", 0.0)),
         icw_icir=float(combinations.get("ic_weighted", {}).get("icir", 0.0)),
-        lasso_ic=float(selections.get("lasso", {}).get("ic", 0.0)),
-        lasso_icir=float(selections.get("lasso", {}).get("icir", 0.0)),
-        xgb_ic=float(selections.get("xgboost", {}).get("ic", 0.0)),
-        xgb_icir=float(selections.get("xgboost", {}).get("icir", 0.0)),
+        lasso_ic=selection_metric(selections, "lasso", "ic"),
+        lasso_icir=selection_metric(selections, "lasso", "icir"),
+        xgb_ic=selection_metric(selections, "xgboost", "ic"),
+        xgb_icir=selection_metric(selections, "xgboost", "icir"),
+        unavailable=unavailable_selections(selections),
         n_factors=benchmark_library_size,
         admission_rate=benchmark_library_size / max(benchmark_succeeded, 1),
         elapsed_seconds=elapsed_seconds,

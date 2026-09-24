@@ -72,18 +72,11 @@ class PreprocessConfig:
 def compute_vwap(df: pd.DataFrame) -> pd.DataFrame:
     """Add ``vwap`` column: amount / volume.  NaN when volume is zero."""
     # df = df.copy()
-
-    # df["vwap"] = np.where(
-    #     df["volume"] > 0,
-    #     df["amount"] / df["volume"],
-    #     np.nan,
-    # )
-
-    result = np.full_like(
-        df["amount"], np.nan, dtype=np.result_type(df["amount"], df["volume"], np.float64)
-    )
-    np.divide(df["amount"], df["volume"], out=result, where=df["volume"] > 0)
-    df["vwap"] = result
+    amount = df["amount"].to_numpy(dtype=np.float64, copy=False)
+    volume = df["volume"].to_numpy(dtype=np.float64, copy=False)
+    vwap = np.full(len(df), np.nan, dtype=np.float64)
+    np.divide(amount, volume, out=vwap, where=volume > 0)
+    df["vwap"] = vwap
     return df
 
 
@@ -93,7 +86,6 @@ def compute_returns(df: pd.DataFrame) -> pd.DataFrame:
     Returns are computed as ``close[t] / close[t-1] - 1`` within each asset.
     The first observation per asset is NaN.
     """
-    # df = df.copy()
     df = df.sort_values(["asset_id", "datetime"])
     df["returns"] = df.groupby("asset_id")["close"].pct_change()
     return df
@@ -152,11 +144,6 @@ def mask_halts(df: pd.DataFrame) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
-def _extract_date(dt_series: pd.Series) -> pd.Series:
-    """Return the date component of a datetime series."""
-    return dt_series.dt.date
-
-
 def fill_missing(
     df: pd.DataFrame,
     ffill_limit: int | None = None,
@@ -192,38 +179,25 @@ def fill_missing(
     columns : sequence of str, optional
         Columns to fill.  Defaults to numeric columns.
     """
-    # FIXME we disable copy here for mem cost
+    if cross_fill_method not in {"median", "mean"}:
+        raise ValueError(f"Unknown cross_fill_method: {cross_fill_method}")
     # df = df.copy()
     if columns is None:
         columns = df.select_dtypes(include=[np.number]).columns.tolist()
     columns = [c for c in columns if c in df.columns]
-    if not columns:
+    missing = [c for c in columns if df[c].isna().any()]
+    if not missing:
         return df
 
-    # Only touch columns that actually carry gaps; a clean column costs nothing.
-    needs_fill = [c for c in columns if df[c].isna().any()]
-    if not needs_fill:
-        return df
+    # A single grouped fill replaces one Python callback per asset/session/column.
+    day = df["datetime"].dt.normalize()
+    df[missing] = df.groupby([df["asset_id"], day], sort=False)[missing].ffill(limit=ffill_limit)
 
-    # Stage 1: forward fill within (asset, calendar day).  ``normalize()`` keeps
-    # the grouping on datetime64 instead of python ``date`` objects.
-    day_key = df["datetime"].dt.normalize()
-    filled = df.groupby([df["asset_id"], day_key], sort=False)[needs_fill].ffill(limit=ffill_limit)
-    df[needs_fill] = filled
-
-    # Stage 2: cross-sectional fill per datetime.
-    if cross_fill_method == "median":
-        agg_func = "median"
-    elif cross_fill_method == "mean":
-        agg_func = "mean"
-    else:
-        raise ValueError(f"Unknown cross_fill_method: {cross_fill_method}")
-
-    still_missing = [c for c in needs_fill if df[c].isna().any()]
-    for col in still_missing:
-        cross_vals = df.groupby("datetime", sort=False)[col].transform(agg_func)
+    for col in missing:
+        if not df[col].isna().any():
+            continue
+        cross_vals = df.groupby("datetime", sort=False)[col].transform(cross_fill_method)
         df[col] = df[col].fillna(cross_vals)
-
     return df
 
 
@@ -260,13 +234,11 @@ def winsorise(
     # per group, which dominated the preprocessing wall time on daily panels.
     datetime_key = df["datetime"]
     for col in columns:
-        grp = df.groupby("datetime", sort=False)[col]
-        lo = grp.quantile(lower / 100.0)
-        hi = grp.quantile(upper / 100.0)
-        df[col] = df[col].clip(
-            lower=datetime_key.map(lo),
-            upper=datetime_key.map(hi),
-        )
+        grouped = df.groupby("datetime", sort=False)[col]
+        bounds = grouped.quantile([lower / 100.0, upper / 100.0]).unstack()
+        lo = df["datetime"].map(bounds[lower / 100.0])
+        hi = df["datetime"].map(bounds[upper / 100.0])
+        df[col] = df[col].clip(lower=lo, upper=hi)
     return df
 
 
@@ -346,13 +318,9 @@ def quality_check(
     if n_assets == 0:
         return df
 
-    # Vectorised: one boolean reduction plus one groupby sum, instead of a
-    # per-group ``apply`` (which is a Python call per time step).
     valid_rows = df[list(columns)].notna().all(axis=1)
-    per_dt = valid_rows.groupby(df["datetime"], sort=False).sum()
-    ratio = per_dt / n_assets
-    valid_dts = per_dt.index[ratio >= min_nonnan_ratio]
-
+    counts = valid_rows.groupby(df["datetime"], sort=False).sum()
+    valid_dts = counts.index[counts / n_assets >= min_nonnan_ratio]
     before = df["datetime"].nunique()
     df = df[df["datetime"].isin(valid_dts)]
     after = df["datetime"].nunique()

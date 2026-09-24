@@ -60,6 +60,7 @@ def run_mypy() -> Counter[Diagnostic]:
         r"^factorminer/tests/",
         "--no-error-summary",
         "--no-pretty",
+        "--no-incremental",
     ]
     completed = subprocess.run(command, check=False, capture_output=True, text=True)
     if completed.returncode not in (0, 1):

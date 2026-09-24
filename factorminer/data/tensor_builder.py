@@ -20,7 +20,14 @@ logger = logging.getLogger(__name__)
 # DSL leaves use the "$" prefix (see factorminer.core.types); these are the
 # DataFrame column names that feed the (M, T, F) tensor.
 DEFAULT_FEATURES: list[str] = [
-    "open", "high", "low", "close", "volume", "amount", "vwap", "returns",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "amount",
+    "vwap",
+    "returns",
 ]
 
 Backend = Literal["numpy", "torch", "cupy"]
@@ -66,6 +73,7 @@ class TensorConfig:
         Name of the column holding the target variable (created by
         :func:`compute_target`).
     """
+
     features: list[str] = field(default_factory=lambda: list(DEFAULT_FEATURES))
     extra_features: list[str] = field(default_factory=list)
     backend: Backend = "numpy"
@@ -96,6 +104,7 @@ class TensorConfig:
 # Target variable
 # ---------------------------------------------------------------------------
 
+
 def compute_target(df: pd.DataFrame) -> pd.DataFrame:
     """Compute the target: next-bar open-to-close return.
 
@@ -124,8 +133,6 @@ def compute_targets(
     target_specs: Sequence[TargetSpec],
 ) -> pd.DataFrame:
     """Compute one or more named forward-return targets on the same panel."""
-    # ``sort_values`` already returns a fresh frame; the extra ``.copy()``
-    # doubled resident memory on multi-million-row panels.
     df = df.sort_values(["asset_id", "datetime"])
 
     for spec in target_specs:
@@ -188,11 +195,10 @@ def _resolve_target_offsets(spec: TargetSpec) -> tuple[str, str, int, int]:
 # Tensor construction helpers
 # ---------------------------------------------------------------------------
 
+
 def _to_backend(arr: np.ndarray, backend: Backend, dtype: str):
     """Convert a numpy array to the requested backend."""
     np_dtype = getattr(np, dtype, np.float32)
-    # ``asarray`` is a no-op when the dtype already matches; ``astype`` always
-    # materialised a second full copy of the (M, T, F) panel.
     arr = np.asarray(arr, dtype=np_dtype)
 
     if backend == "numpy":
@@ -203,8 +209,7 @@ def _to_backend(arr: np.ndarray, backend: Backend, dtype: str):
             import torch
         except ImportError as exc:
             raise ImportError(
-                "PyTorch is required for backend='torch'. "
-                "Install with: pip install torch"
+                "PyTorch is required for backend='torch'. Install with: pip install torch"
             ) from exc
         torch_dtype = getattr(torch, dtype, torch.float32)
         return torch.from_numpy(arr).to(torch_dtype)
@@ -214,8 +219,7 @@ def _to_backend(arr: np.ndarray, backend: Backend, dtype: str):
             import cupy  # type: ignore[import-untyped]
         except ImportError as exc:
             raise ImportError(
-                "CuPy is required for backend='cupy'. "
-                "Install with: pip install cupy"
+                "CuPy is required for backend='cupy'. Install with: pip install cupy"
             ) from exc
         return cupy.asarray(arr, dtype=dtype)
 
@@ -234,15 +238,11 @@ def _build_3d(
     F = len(columns)
     tensor = np.full((M, T, F), np.nan, dtype=np.float64)
 
-    # ``Index.get_indexer`` resolves both axes in one vectorised pass.  The
-    # previous implementation deep-copied the whole panel just to attach two
-    # temporary index columns, which dominated peak RSS on million-row panels.
-    asset_pos = pd.Index(asset_ids).get_indexer(df["asset_id"])
-    time_pos = pd.Index(timestamps).get_indexer(df["datetime"])
-    valid = (asset_pos >= 0) & (time_pos >= 0)
-
-    values = df[list(columns)].to_numpy(dtype=np.float64)
-    tensor[asset_pos[valid], time_pos[valid], :] = values[valid]
+    asset_index = pd.Index(asset_ids).get_indexer(df["asset_id"])
+    time_index = pd.Index(timestamps).get_indexer(df["datetime"])
+    valid = (asset_index >= 0) & (time_index >= 0)
+    values = df[list(columns)].to_numpy(dtype=np.float64, copy=False)
+    tensor[asset_index[valid], time_index[valid], :] = values[valid]
 
     return tensor
 
@@ -250,6 +250,7 @@ def _build_3d(
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class TensorDataset:
@@ -360,6 +361,7 @@ def build_tensor(
 # Temporal split
 # ---------------------------------------------------------------------------
 
+
 def temporal_split(
     ds: TensorDataset,
     train_end: str | None = None,
@@ -437,6 +439,7 @@ def temporal_split(
 # Asset subset sampling
 # ---------------------------------------------------------------------------
 
+
 def sample_assets(
     ds: TensorDataset,
     m: int,
@@ -483,8 +486,7 @@ def sample_assets(
         data=d_sub,
         target=t_sub,
         targets={
-            name: target[idx, :] if target is not None else None
-            for name, target in targets.items()
+            name: target[idx, :] if target is not None else None for name, target in targets.items()
         },
         default_target=ds.default_target,
         asset_ids=ds.asset_ids[idx],

@@ -71,6 +71,15 @@ evaluation:
   # "raise" = propagate the raw exception.
   signal_failure_policy: "reject"
 
+  # Storage precision for retained benchmark signal panels. Metrics are
+  # computed at float64 precision before storage; float32 uses half the RAM.
+  signal_dtype: "float64"
+
+  # Resident budget (MiB) for retained benchmark signal panels. When set,
+  # least-recently-used panels spill to temporary .npy files and are read back
+  # exactly through memory maps. null keeps every retained panel in memory.
+  signal_cache_mb: null
+
 # ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------

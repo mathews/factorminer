@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import pandas as pd
+import pandas as pd  # type: ignore[import-untyped]
 
 from factorminer.benchmark.contracts import (
     BenchmarkManifest,
@@ -118,6 +118,8 @@ from factorminer.benchmark.statistics import (
     StatisticalComparisonTests,
     aggregate_method_results,
     method_result_dispersion,
+    selection_metric,
+    unavailable_selections,
 )
 from factorminer.benchmark.statistics import (
     DMTestResult as DMTestResult,
@@ -133,6 +135,7 @@ from factorminer.evaluation.runtime import (
     evaluate_factors,
     release_artifact_signals,
 )
+from factorminer.evaluation.signal_store import open_signal_store
 from factorminer.operators.c_backend import backend_available as c_backend_available
 
 logger = logging.getLogger(__name__)
@@ -250,14 +253,22 @@ def run_table1_benchmark(
             )
             candidate_count = len(entries)
 
-        # Library admission reads only the train split; every other split panel
-        # would be dead weight for the whole candidate set.
+        selection_split = (
+            "validation" if "validation" in getattr(freeze_dataset, "splits", {}) else "train"
+        )
+        signal_store = open_signal_store(
+            freeze_dataset,
+            retain_splits=("train", selection_split),
+            dtype=getattr(cfg.evaluation, "signal_dtype", "float64"),
+            cache_mb=getattr(cfg.evaluation, "signal_cache_mb", None),
+        )
         artifacts = evaluate_factors(
             factors,
             freeze_dataset,
             signal_failure_policy="reject",
-            retain_splits=("train",),
-            signal_dtype=_signal_dtype(cfg),
+            retain_splits=None if signal_store else ("train", selection_split),
+            signal_dtype=getattr(cfg.evaluation, "signal_dtype", "float64"),
+            signal_store=signal_store,
         )
 
         library_cfg = _cfg_with_overrides(cfg, cfg.benchmark.freeze_universe)
@@ -271,20 +282,19 @@ def run_table1_benchmark(
             ic_threshold=library_cfg.mining.ic_threshold,
             correlation_threshold=library_cfg.mining.correlation_threshold,
         )
-        selection_split = (
-            "validation" if "validation" in getattr(freeze_dataset, "splits", {}) else "train"
-        )
         frozen = select_frozen_top_k(
             artifacts,
             library,
             top_k=cfg.benchmark.freeze_top_k,
             split_name=selection_split,
         )
-        # ``evaluate_frozen_set`` rebuilds factors from name/formula/category and
-        # recomputes every signal on the report universe, so the freeze-universe
-        # panels are unreachable from here on.  Dropping them now avoids holding
-        # two full candidate sets (freeze + frozen) resident at the same time.
-        release_artifact_signals(artifacts)
+        for artifact in artifacts:
+            artifact.release_signals()
+        for factor in library.list_factors():
+            factor.signals = None
+        signal_cache_stats = signal_store.stats() if signal_store else None
+        if signal_store is not None:
+            signal_store.close()
 
         baseline_result = {
             "baseline": baseline,
@@ -301,6 +311,7 @@ def run_table1_benchmark(
             "freeze_library_size": library.size,
             "freeze_stats": library_stats,
             "selection_split": selection_split,
+            "signal_cache": signal_cache_stats,
             "frozen_top_k": [
                 {
                     "name": artifact.name,
@@ -366,7 +377,8 @@ def run_table1_benchmark(
                 n_trials=candidate_count,
                 include_capacity_evidence=bool(cfg.phase2.capacity.enabled),
                 family_ic_series=family_ic_series,
-                signal_dtype=_signal_dtype(cfg),
+                signal_dtype=getattr(cfg.evaluation, "signal_dtype", "float64"),
+                signal_cache_mb=getattr(cfg.evaluation, "signal_cache_mb", None),
             )
 
         result_path = benchmark_dir / f"{baseline}.json"
@@ -1057,8 +1069,6 @@ def _method_result_from_runtime_payload(
     selections = evaluation.get("selections", {})
     equal_weight = combinations.get("equal_weight", {})
     ic_weighted = combinations.get("ic_weighted", {})
-    lasso = selections.get("lasso", {})
-    xgboost = selections.get("xgboost", {})
     freeze_stats = payload.get("freeze_stats", {})
     succeeded = max(int(freeze_stats.get("succeeded", 0)), 1)
     ic_series = np.asarray(equal_weight.get("ic_series", []), dtype=np.float64)
@@ -1071,10 +1081,11 @@ def _method_result_from_runtime_payload(
         ew_icir=float(equal_weight.get("icir", 0.0) or 0.0),
         icw_ic=float(ic_weighted.get("ic", 0.0) or 0.0),
         icw_icir=float(ic_weighted.get("icir", 0.0) or 0.0),
-        lasso_ic=float(lasso.get("ic", 0.0) or 0.0),
-        lasso_icir=float(lasso.get("icir", 0.0) or 0.0),
-        xgb_ic=float(xgboost.get("ic", 0.0) or 0.0),
-        xgb_icir=float(xgboost.get("icir", 0.0) or 0.0),
+        lasso_ic=selection_metric(selections, "lasso", "ic"),
+        lasso_icir=selection_metric(selections, "lasso", "icir"),
+        xgb_ic=selection_metric(selections, "xgboost", "ic"),
+        xgb_icir=selection_metric(selections, "xgboost", "icir"),
+        unavailable=unavailable_selections(selections),
         n_factors=int(evaluation.get("factor_count", 0) or 0),
         admission_rate=float(freeze_stats.get("admitted", 0)) / succeeded,
         avg_turnover=float(equal_weight.get("turnover", 0.0) or 0.0),

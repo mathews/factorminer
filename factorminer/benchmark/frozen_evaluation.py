@@ -11,6 +11,7 @@ import numpy.typing as npt
 from factorminer.benchmark.catalogs import CandidateEntry
 from factorminer.benchmark.contracts import json_safe as _json_safe
 from factorminer.benchmark.datasets import _factors_from_entries
+from factorminer.benchmark.model_worker import run_isolated_selection
 from factorminer.core.factor_library import FactorLibrary
 from factorminer.evaluation.metrics import METRIC_VERSION
 from factorminer.evaluation.runtime import (
@@ -20,6 +21,7 @@ from factorminer.evaluation.runtime import (
     evaluate_factors,
     release_artifact_signals,
 )
+from factorminer.evaluation.signal_store import open_signal_store
 
 
 def _default_capacity_levels() -> list[float]:
@@ -197,9 +199,16 @@ def evaluate_frozen_set(
     n_trials: int = 1,
     include_capacity_evidence: bool = False,
     family_ic_series: dict[str, np.ndarray] | None = None,
-    signal_dtype: npt.DTypeLike | None = None,
+    signal_dtype: str = "float64",
+    signal_cache_mb: float | None = None,
+    isolate_native_models: bool = True,
 ) -> dict:
-    """Evaluate one frozen factor set on one universe."""
+    """Evaluate one frozen factor set on one universe.
+
+    Native-model selections (XGBoost) run in an isolated worker by default. A
+    selection that fails, crashes, or times out is reported with
+    ``status: "unavailable"`` and its cause instead of a score.
+    """
     if cost_bps is None:
         cost_bps = [1.0, 4.0, 7.0, 10.0, 11.0]
     if capacity_levels is None:
@@ -213,16 +222,16 @@ def evaluate_frozen_set(
         )
         for artifact in frozen
     )
-    # Only the fit split (for weighting/selection) and the held-out split (for
-    # scoring) are consumed below; retaining every split panel would cost
-    # ``len(frozen) * splits`` full (M, T) arrays for no benefit.
-    needed_splits = tuple(dict.fromkeys((fit_split, split_name)))
+    signal_store = open_signal_store(
+        dataset, retain_splits=(fit_split, split_name), dtype=signal_dtype, cache_mb=signal_cache_mb
+    )
     artifacts = evaluate_factors(
         factors,
         dataset,
         signal_failure_policy="reject",
-        retain_splits=needed_splits,
+        retain_splits=None if signal_store else (fit_split, split_name),
         signal_dtype=signal_dtype,
+        signal_store=signal_store,
     )
     succeeded = [artifact for artifact in artifacts if artifact.succeeded]
 
@@ -252,7 +261,10 @@ def evaluate_frozen_set(
     }
     if not succeeded:
         result["warnings"].append("No frozen factors recomputed successfully on this universe")
-        release_artifact_signals(artifacts)
+        for artifact in artifacts:
+            artifact.release_signals()
+        if signal_store is not None:
+            signal_store.close()
         return result
 
     result["library"] = {
@@ -391,18 +403,49 @@ def evaluate_frozen_set(
         result["industry_evidence"][name] = evidence_payload
 
     selection_specs = {}
-    try:
-        selection_specs["lasso"] = selector.lasso_selection(fit_signals, fit_returns)
-    except Exception as exc:
-        result["warnings"].append(f"lasso unavailable: {exc}")
-    try:
-        selection_specs["forward_stepwise"] = selector.forward_stepwise(fit_signals, fit_returns)
-    except Exception as exc:
-        result["warnings"].append(f"forward_stepwise unavailable: {exc}")
-    try:
-        selection_specs["xgboost"] = selector.xgboost_selection(fit_signals, fit_returns)
-    except Exception as exc:
-        result["warnings"].append(f"xgboost unavailable: {exc}")
+
+    selections_out: dict[str, Any] = result["selections"]  # type: ignore[assignment]
+    warnings_out: list[str] = result["warnings"]  # type: ignore[assignment]
+
+    def mark_unavailable(name: str, record: dict[str, Any]) -> None:
+        selections_out[name] = record
+        warnings_out.append(f"{name} unavailable: {record['cause']}")
+
+    for name, method in (
+        ("lasso", selector.lasso_selection),
+        ("forward_stepwise", selector.forward_stepwise),
+    ):
+        try:
+            selection_specs[name] = method(fit_signals, fit_returns)
+        except Exception as exc:
+            mark_unavailable(
+                name,
+                {
+                    "status": "unavailable",
+                    "failure": "error",
+                    "cause": f"{type(exc).__name__}: {exc}",
+                    "factor_count": 0,
+                },
+            )
+    if isolate_native_models:
+        outcome = run_isolated_selection("xgboost", fit_signals, fit_returns)
+        if outcome.ok:
+            selection_specs["xgboost"] = outcome.ranking
+        else:
+            mark_unavailable("xgboost", outcome.unavailable_record())
+    else:
+        try:
+            selection_specs["xgboost"] = selector.xgboost_selection(fit_signals, fit_returns)
+        except Exception as exc:
+            mark_unavailable(
+                "xgboost",
+                {
+                    "status": "unavailable",
+                    "failure": "error",
+                    "cause": f"{type(exc).__name__}: {exc}",
+                    "factor_count": 0,
+                },
+            )
 
     for name, ranking in selection_specs.items():
         if not ranking:
@@ -438,7 +481,8 @@ def evaluate_frozen_set(
             ),
         }
 
-    # ``result`` holds only scalars and small series; the (M, T) panels are the
-    # dominant allocation of the whole benchmark and are no longer reachable.
-    release_artifact_signals(artifacts)
+    for artifact in artifacts:
+        artifact.release_signals()
+    if signal_store is not None:
+        signal_store.close()
     return result

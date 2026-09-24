@@ -11,6 +11,21 @@ import numpy as np
 import pandas as pd
 
 
+def selection_metric(selections: dict[str, Any], name: str, key: str) -> float:
+    """Read a selection metric; NaN when the selection was unavailable."""
+    entry = selections.get(name, {}) or {}
+    if entry.get("status") == "unavailable":
+        return float("nan")
+    return float(entry.get(key, 0.0) or 0.0)
+
+
+def unavailable_selections(selections: dict[str, Any]) -> list[str]:
+    return sorted(
+        name for name, entry in selections.items()
+        if isinstance(entry, dict) and entry.get("status") == "unavailable"
+    )
+
+
 @dataclass
 class MethodResult:
     """Flattened metrics for one method in a comparison report."""
@@ -33,6 +48,9 @@ class MethodResult:
     avg_turnover: float = 0.0
     ic_series: np.ndarray | None = field(default=None, repr=False)
     run_id: int = 0
+    # Selections that could not run (e.g. a native model crash). Their
+    # metrics are NaN, never a measured zero.
+    unavailable: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -77,6 +95,7 @@ def aggregate_method_results(results: list[MethodResult]) -> MethodResult:
     for name in _METHOD_RESULT_MEAN_FIELDS:
         setattr(aggregate, name, float(np.mean([getattr(r, name) for r in results])))
     aggregate.n_factors = int(round(float(np.mean([r.n_factors for r in results]))))
+    aggregate.unavailable = sorted({name for r in results for name in r.unavailable})
     return aggregate
 
 

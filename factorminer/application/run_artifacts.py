@@ -65,6 +65,17 @@ class MiningArtifactService:
             notes=[],
         )
         loop._run_manifest = manifest.to_dict()
+        from factorminer.agent.provider_config import describe_providers
+
+        providers = describe_providers(getattr(loop.generator, "llm_provider", None))
+        if providers:
+            loop._run_manifest["model_providers"] = providers
+        profile = getattr(loop, "runtime_profile", None)
+        if profile is not None:
+            loop._run_manifest["runtime_profile"] = profile.to_dict()
+            index = getattr(loop.library.dependence_metric, "index", None)
+            if index is not None:
+                loop._run_manifest["runtime_profile"]["dependence_index"] = index.stats()
         actions = getattr(loop, "research_actions", None)
         if actions is not None:
             loop._run_manifest["research_actions"] = actions.ledger.summary()

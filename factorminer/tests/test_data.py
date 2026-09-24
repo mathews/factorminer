@@ -8,6 +8,7 @@ import pytest
 
 from factorminer.data.loader import load_market_data
 from factorminer.data.mock_data import MockConfig, generate_mock_data, generate_with_halts
+from factorminer.data.preprocessor import compute_vwap, fill_missing, quality_check, winsorise
 
 # ---------------------------------------------------------------------------
 # Mock data generation
@@ -176,6 +177,44 @@ class TestFeatureComputation:
         # Rest should be finite
         rest = df.dropna(subset=["returns"])
         assert np.isfinite(rest["returns"]).all()
+
+    def test_vwap_zero_volume_is_nan_without_division_error(self):
+        frame = pd.DataFrame({"amount": [10.0, 20.0], "volume": [2.0, 0.0]})
+        with np.errstate(all="raise"):
+            result = compute_vwap(frame)
+        assert result["vwap"].iloc[0] == 5.0
+        assert np.isnan(result["vwap"].iloc[1])
+
+
+def test_intraday_fill_does_not_cross_session_boundary():
+    frame = pd.DataFrame(
+        {
+            "datetime": pd.to_datetime(
+                ["2026-01-01 09:30"] * 3
+                + ["2026-01-01 09:40"] * 3
+                + ["2026-01-02 09:30"] * 3
+            ),
+            "asset_id": ["A", "B", "C"] * 3,
+            "value": [1.0, 3.0, np.nan, np.nan, np.nan, 6.0, np.nan, 8.0, np.nan],
+        }
+    )
+    result = fill_missing(frame, columns=["value"], ffill_limit=1)
+    np.testing.assert_allclose(result["value"], [1, 3, 2, 1, 3, 6, 8, 8, 8])
+
+
+def test_winsorise_and_quality_check_keep_cross_section_semantics():
+    frame = pd.DataFrame(
+        {
+            "datetime": pd.to_datetime(["2026-01-01"] * 3 + ["2026-01-02"] * 3),
+            "asset_id": ["A", "B", "C"] * 2,
+            "value": [0.0, 10.0, 100.0, np.nan, np.nan, np.nan],
+        }
+    )
+    clipped = winsorise(frame, ["value"], lower=0, upper=50)
+    np.testing.assert_allclose(clipped["value"].iloc[:3], [0, 10, 10])
+    assert clipped["value"].iloc[3:].isna().all()
+    valid = quality_check(clipped, columns=["value"], min_nonnan_ratio=0.5)
+    assert valid["datetime"].nunique() == 1
 
 
 # ---------------------------------------------------------------------------

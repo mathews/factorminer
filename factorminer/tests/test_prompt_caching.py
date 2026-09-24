@@ -167,7 +167,7 @@ def test_debate_generator_wraps_provider_with_shared_prefix():
 
 def test_create_provider_prompt_cache_default_on():
     p = create_provider({"provider": "openai", "model": "gpt-4o", "api_key": "k"})
-    assert isinstance(p, OpenAIProvider)
+    assert isinstance(p.inner, OpenAIProvider)
     assert p.prompt_cache is True
 
     a = create_provider(
@@ -178,7 +178,7 @@ def test_create_provider_prompt_cache_default_on():
             "prompt_cache": False,
         }
     )
-    assert isinstance(a, AnthropicProvider)
+    assert isinstance(a.inner, AnthropicProvider)
     assert a.prompt_cache is False
 
 

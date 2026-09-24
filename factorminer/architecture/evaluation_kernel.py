@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -17,7 +17,11 @@ from factorminer.evaluation.research import (
     compute_factor_geometry,
     passes_research_admission,
 )
-from factorminer.evaluation.runtime import SignalComputationError, compute_tree_signals
+from factorminer.evaluation.runtime import (
+    SignalComputationError,
+    compute_batch_signals,
+    compute_tree_signals,
+)
 
 # Optional reward-hook type. Kept as a loose Callable to avoid a hard import
 # cycle with ``rft_export`` (which itself may call into the kernel). A future
@@ -76,6 +80,49 @@ class EvaluationKernel:
         )
         return tree, np.asarray(signals, dtype=np.float64)
 
+    def compute_batch_signals(
+        self,
+        *,
+        formulas: Sequence[str],
+        data_dict: dict[str, np.ndarray],
+        returns_shape: tuple[int, int],
+        signal_failure_policy: str | None = None,
+    ) -> list[tuple[Any, np.ndarray | None, Exception | None]]:
+        """Compute signals for several formulas through one shared plan.
+
+        Returns ``(tree, signals, error)`` per formula, in input order, where
+        ``error`` is what :meth:`compute_signals` would raise for that formula.
+        Subexpressions shared by the batch are evaluated once.
+        """
+        return list(self.iter_batch_signals(
+            formulas=formulas, data_dict=data_dict, returns_shape=returns_shape,
+            signal_failure_policy=signal_failure_policy,
+        ))
+
+    def iter_batch_signals(
+        self,
+        *,
+        formulas: Sequence[str],
+        data_dict: dict[str, np.ndarray],
+        returns_shape: tuple[int, int],
+        signal_failure_policy: str | None = None,
+    ) -> Iterator[tuple[Any, np.ndarray | None, Exception | None]]:
+        """Yield formula outcomes in order without retaining every signal panel."""
+        trees = [try_parse(formula) for formula in formulas]
+        parsed = [tree for tree in trees if tree is not None]
+        outcomes = iter(compute_batch_signals(
+            parsed,
+            data_dict,
+            returns_shape,
+            signal_failure_policy=signal_failure_policy or self.protocol.signal_failure_policy,
+        ))
+        for formula, tree in zip(formulas, trees, strict=True):
+            if tree is None:
+                yield None, None, SignalComputationError(f"Parse failure for '{formula}'")
+            else:
+                _index, signals, error = next(outcomes)
+                yield tree, signals, error
+
     def compute_target_stats(
         self,
         signals: np.ndarray,
@@ -105,7 +152,9 @@ class EvaluationKernel:
             and getattr(self.research_config, "enabled", False)
             and benchmark_mode == "research"
         ):
-            paper_stats = target_stats.get("paper") or next(iter(target_stats.values()))
+            paper_stats = target_stats.get(self.protocol.default_target) or next(
+                iter(target_stats.values())
+            )
             return {
                 "quality_gate": float(paper_stats["ic_paper_mean"]),
                 "icir": float(paper_stats["ic_paper_icir"]),

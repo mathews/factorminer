@@ -46,8 +46,18 @@ class LoopExecutionService:
         payload: IterationPayload,
         stage_names: Sequence[str],
     ) -> None:
+        profile = getattr(self.loop, "runtime_profile", None)
         for stage_name in stage_names:
-            self.loop.stages[stage_name].run(self.loop, payload)
+            if profile is None:
+                self.loop.stages[stage_name].run(self.loop, payload)
+                continue
+            with profile.stage(stage_name):
+                self.loop.stages[stage_name].run(self.loop, payload)
+            if stage_name == "evaluate":
+                profile.record_panels(
+                    stage_name, (getattr(result, "signals", None) for result in payload.results)
+                )
+                profile.record_outcomes(stage_name, payload.results)
 
     def execute_iteration(
         self,
@@ -87,7 +97,7 @@ class LoopExecutionService:
         payload.memory_signal = retrieval.enrich(payload.memory_signal)
         actions = getattr(self.loop, "research_actions", None)
         action_kind = actions.prepare(payload) if actions is not None else "generate"
-        if action_kind in ("stop", "challenge"):
+        if actions is not None and action_kind in ("stop", "challenge"):
             if action_kind == "challenge":
                 actions.challenge(payload)
             elapsed = time.time() - started_at
@@ -96,7 +106,7 @@ class LoopExecutionService:
             stats = self.build_stats(payload, elapsed)
             self.log_telemetry(self.build_telemetry(payload, stats, elapsed))
             return stats
-        if action_kind == "refine":
+        if actions is not None and action_kind == "refine":
             actions.refine(payload)
         else:
             self.run_stage_chain(payload, ("generate",))
