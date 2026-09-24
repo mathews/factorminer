@@ -26,6 +26,7 @@ from factorminer.evaluation.metrics import (
     compute_pairwise_correlation,
 )
 from factorminer.evaluation.signal_store import SplitSignalStore, split_selectors
+from factorminer.settings import DEFAULT_DATA_TYPE
 
 logger = logging.getLogger(__name__)
 
