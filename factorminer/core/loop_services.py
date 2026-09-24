@@ -6,6 +6,7 @@ centralizing the repeated stage-chain execution and iteration telemetry.
 
 from __future__ import annotations
 
+import gc
 import logging
 import time
 from collections.abc import Sequence
@@ -58,7 +59,9 @@ class LoopExecutionService:
         """Execute an iteration, retaining failed action accounting for resume."""
         try:
             return self._execute_iteration(
-                batch_size, trailing_stages=trailing_stages, phase2_summary=phase2_summary,
+                batch_size,
+                trailing_stages=trailing_stages,
+                phase2_summary=phase2_summary,
             )
         except BaseException as exc:
             actions = getattr(self.loop, "research_actions", None)
@@ -118,6 +121,9 @@ class LoopExecutionService:
         if actions is not None:
             actions.record_evaluation_dispatch(payload)
         self.run_stage_chain(payload, ("evaluate", "library_update"))
+
+        gc.collect()
+
         summary = dict(phase2_summary or {})
         if "phase2_rejections" in payload.stage_metrics:
             summary["phase2_rejections"] = payload.stage_metrics["phase2_rejections"]
@@ -129,8 +135,11 @@ class LoopExecutionService:
             },
             memory_signal=payload.memory_signal,
             phase2_summary=summary,
-            generator_family=("deterministic_refinement" if action_kind == "refine"
-                              else self.loop._generator_family()),
+            generator_family=(
+                "deterministic_refinement"
+                if action_kind == "refine"
+                else self.loop._generator_family()
+            ),
         )
 
         self.run_stage_chain(payload, ("distill", *trailing_stages))
@@ -151,6 +160,9 @@ class LoopExecutionService:
             candidates_generated=self.candidate_count(payload),
         )
         self.log_telemetry(telemetry)
+
+        gc.collect()
+
         return stats
 
     def candidate_count(self, payload: IterationPayload) -> int:
@@ -242,7 +254,9 @@ class LoopExecutionService:
             ic_passed=int(telemetry.stats.get("ic_passed", 0)),
             correlation_passed=int(telemetry.stats.get("corr_passed", 0)),
             admitted=int(telemetry.stats.get("admitted", 0)),
-            rejected=max(telemetry.candidates_generated - int(telemetry.stats.get("admitted", 0)), 0),
+            rejected=max(
+                telemetry.candidates_generated - int(telemetry.stats.get("admitted", 0)), 0
+            ),
             replaced=int(telemetry.stats.get("replaced", 0)),
             library_size=int(telemetry.stats.get("library_size", 0)),
             best_ic=max(ic_values) if ic_values else 0.0,

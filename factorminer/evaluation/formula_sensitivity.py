@@ -7,6 +7,7 @@ Uses ``core/expression_tree.py`` tree-walk APIs read-only.
 
 from __future__ import annotations
 
+import gc
 import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
@@ -104,6 +105,7 @@ def _ic_pair(signals: np.ndarray, returns: np.ndarray) -> tuple[float, float]:
 def _safe_eval(tree: ExpressionTree, data: Mapping[str, np.ndarray]) -> np.ndarray | None:
     try:
         out = tree.evaluate(dict(data))
+        gc.collect()
     except Exception:  # noqa: BLE001 - ablations must fail closed
         logger.debug("sensitivity eval failed for %s", tree.to_string(), exc_info=True)
         return None
@@ -159,7 +161,9 @@ def _node_path_replace(
     )
 
 
-def _collect_operator_paths(node: Node, prefix: tuple[int, ...] = ()) -> list[tuple[tuple[int, ...], OperatorNode]]:
+def _collect_operator_paths(
+    node: Node, prefix: tuple[int, ...] = ()
+) -> list[tuple[tuple[int, ...], OperatorNode]]:
     """Collect (path, operator_node) pairs for every operator subtree."""
     found: list[tuple[tuple[int, ...], OperatorNode]] = []
     if isinstance(node, OperatorNode):
@@ -389,9 +393,7 @@ def analyze_formula_sensitivity(
     # Prefer larger / deeper subtrees first, then cap.
     op_paths.sort(key=lambda item: item[1].size(), reverse=True)
     for path, op_node in op_paths[: cfg.max_operator_subtrees]:
-        replaced = ExpressionTree(
-            _node_path_replace(tree.root, path, ConstantNode(0.0))
-        )
+        replaced = ExpressionTree(_node_path_replace(tree.root, path, ConstantNode(0.0)))
         signals = _safe_eval(replaced, data)
         if signals is None:
             continue

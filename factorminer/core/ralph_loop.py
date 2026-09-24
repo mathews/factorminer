@@ -18,6 +18,7 @@ boundary, a research-planner stop, or interruption.
 
 from __future__ import annotations
 
+import gc
 import json
 import logging
 import time
@@ -152,8 +153,9 @@ class RalphLoop:
             target_horizons=dict(self.settings.target_horizons or {}),
         )
         self.memory = memory if memory is not None else create_default_memory()
-        self.memory_policy = build_memory_policy(config, self.protocol, returns=returns,
-                                                 output_dir=self.settings.output_dir)
+        self.memory_policy = build_memory_policy(
+            config, self.protocol, returns=returns, output_dir=self.settings.output_dir
+        )
         self.prompt_context_builder = PromptContextBuilder(
             self.protocol,
             family_discovery=self.family_discovery,
@@ -262,15 +264,23 @@ class RalphLoop:
             raise ValueError("max_iterations must be >= 0; 0 means no iteration ceiling")
         batch_size = self.settings.batch_size
         output_dir = self.settings.output_dir
-        if (not resume and self.iteration == 0 and self.research_actions is not None
-                and self.research_actions.ledger.records()):
-            raise ValueError("Existing research campaign requires resume; use a new output directory for fresh work")
+        if (
+            not resume
+            and self.iteration == 0
+            and self.research_actions is not None
+            and self.research_actions.ledger.records()
+        ):
+            raise ValueError(
+                "Existing research campaign requires resume; use a new output directory for fresh work"
+            )
 
         # Resume from existing checkpoint if requested
         if resume:
             checkpoint_dir = Path(output_dir) / "checkpoint"
-            if checkpoint_dir.exists() or (self.research_actions is not None
-                                           and self.research_actions.ledger.snapshot() is not None):
+            if checkpoint_dir.exists() or (
+                self.research_actions is not None
+                and self.research_actions.ledger.snapshot() is not None
+            ):
                 self.load_session(str(checkpoint_dir))
                 logger.info(
                     "Resuming from iteration %d with %d factors",
@@ -325,7 +335,9 @@ class RalphLoop:
         self.budget.wall_start = time.time()
 
         try:
-            while self.library.size < target_size and (max_iterations == 0 or self.iteration < max_iterations):
+            while self.library.size < target_size and (
+                max_iterations == 0 or self.iteration < max_iterations
+            ):
                 self.iteration += 1
                 stats = self._run_iteration(batch_size)
 
@@ -349,8 +361,12 @@ class RalphLoop:
                 if self.checkpoint_interval > 0 and self.iteration % self.checkpoint_interval == 0:
                     self._checkpoint()
                 if stats.get("research_stop", False):
-                    logger.info("Research planner stopped: %s", stats["research_action"]["rationale"])
+                    logger.info(
+                        "Research planner stopped: %s", stats["research_action"]["rationale"]
+                    )
                     break
+
+                gc.collect()
 
         except KeyboardInterrupt:
             logger.warning("Mining interrupted by user at iteration %d", self.iteration)
@@ -515,8 +531,12 @@ class RalphLoop:
                 result.parent_ic_paper_mean = chosen["parent_quality"]
                 result.edit_type = "refine"
                 from factorminer.architecture.memory_policy import extract_edit_motif
-                result.edit_motif = (extract_edit_motif(result.parent_formula, result.formula)
-                                     if chosen.get("recipe_id") else "temporal_smoothing")
+
+                result.edit_motif = (
+                    extract_edit_motif(result.parent_formula, result.formula)
+                    if chosen.get("recipe_id")
+                    else "temporal_smoothing"
+                )
                 continue
             if result.parent_formula:
                 continue
@@ -725,8 +745,11 @@ class RalphLoop:
             "library_size": self.library.size,
             "memory_version": self.memory.version,
             "generator_batches": self.generator._generation_count,
-            "mock_provider_calls": (self.generator.llm_provider._call_count
-                                    if isinstance(self.generator.llm_provider, MockProvider) else None),
+            "mock_provider_calls": (
+                self.generator.llm_provider._call_count
+                if isinstance(self.generator.llm_provider, MockProvider)
+                else None
+            ),
             "budget": {
                 "llm_calls": self.budget.llm_calls,
                 "llm_prompt_tokens": self.budget.llm_prompt_tokens,
@@ -763,7 +786,10 @@ class RalphLoop:
                 loop_state = json.load(f)
             if loop_state.get("dataset_id", self.trial_dataset_id) != self.trial_dataset_id:
                 raise ValueError("Checkpoint dataset changed; use a separate output directory")
-            if loop_state.get("protocol", self.protocol.runtime_contract()) != self.protocol.runtime_contract():
+            if (
+                loop_state.get("protocol", self.protocol.runtime_contract())
+                != self.protocol.runtime_contract()
+            ):
                 raise ValueError("Checkpoint protocol changed; use a separate output directory")
             self.iteration = loop_state.get("iteration", 0)
             self.generator._generation_count = loop_state.get("generator_batches", 0)
@@ -839,8 +865,10 @@ class RalphLoop:
             self.research_actions.ledger.recover_interrupted()
             self.research_actions.ledger.export()
             self.memory_policy.sync_research_history(
-                self.research_actions.ledger.records(), dataset_id=self.trial_dataset_id,
-                campaign_id=self.research_actions.ledger.campaign_id)
+                self.research_actions.ledger.records(),
+                dataset_id=self.trial_dataset_id,
+                campaign_id=self.research_actions.ledger.campaign_id,
+            )
 
     @classmethod
     def resume_from(

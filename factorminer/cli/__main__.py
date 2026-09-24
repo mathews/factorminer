@@ -4,7 +4,12 @@ from __future__ import annotations
 
 # A. 入口脚本顶部加一行
 # import fast_dependence
+import cudf.pandas
+
 from factorminer.cli import main
+
+cudf.pandas.install()
+
 
 if __name__ == "__main__":
     main()

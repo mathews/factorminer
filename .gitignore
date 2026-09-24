@@ -13,3 +13,6 @@ dist/
 output/
 results/
 docs/_build/
+temp/
+scalene-profile.json
+scalene-profile.html

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import time
 from collections.abc import Callable
 
@@ -114,6 +115,7 @@ class SpeedBenchmark:
                 continue
             try:
                 compute_ic_mean(compute_ic(tree.evaluate(inputs), returns))
+                gc.collect()
             except Exception:
                 continue
             succeeded += 1

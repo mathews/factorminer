@@ -17,6 +17,9 @@ from factorminer.core.types import (
     OperatorSpec,
     get_feature_set,
 )
+from factorminer.settings import DEFAULT_DATA_TYPE
+
+FLOAT64_TYPE = np.float64
 
 # Epsilon for safe division / log
 _EPS = 1e-10
@@ -98,7 +101,7 @@ class LeafNode(Node):
             raise KeyError(
                 f"Feature '{self.feature_name}' not found in data. Available: {sorted(data.keys())}"
             )
-        return data[self.feature_name].astype(np.float64, copy=False)
+        return data[self.feature_name].astype(DEFAULT_DATA_TYPE, copy=False)
 
     def to_string(self) -> str:
         return self.feature_name
@@ -123,8 +126,9 @@ class ConstantNode(Node):
 
     def evaluate(self, data: dict[str, np.ndarray]) -> np.ndarray:
         # Infer shape from any entry in data so the constant broadcasts.
+        # FIXME 若有data, 如何返回呢？
         for arr in data.values():
-            return np.full_like(arr, self.value, dtype=np.float64)
+            return np.full_like(arr, self.value, dtype=DEFAULT_DATA_TYPE)
         raise ValueError("Cannot evaluate ConstantNode with empty data dict.")
 
     def to_string(self) -> str:
@@ -258,7 +262,7 @@ def _rolling_apply(
     np.ndarray, shape (M, T)   – leading positions filled with NaN.
     """
     M, T = x.shape
-    out = np.full_like(x, np.nan, dtype=np.float64)
+    out = np.full_like(x, np.nan, dtype=DEFAULT_DATA_TYPE)
     for t in range(window - 1, T):
         sx = x[:, t - window + 1 : t + 1]
         if binary_y is not None:
@@ -272,7 +276,7 @@ def _rolling_apply(
 def _row_nanmean(sx: np.ndarray, *, keepdims: bool = False) -> np.ndarray:
     """Row-wise NaN mean that is quiet for rows with no observations."""
     valid_counts = np.sum(~np.isnan(sx), axis=1)
-    means = np.full(sx.shape[0], np.nan, dtype=np.float64)
+    means = np.full(sx.shape[0], np.nan, dtype=DEFAULT_DATA_TYPE)
     np.divide(
         np.nansum(sx, axis=1),
         valid_counts,
@@ -292,7 +296,7 @@ def _row_nanvar(
     means = _row_nanmean(sx, keepdims=True)
     valid_counts = np.sum(~np.isnan(sx), axis=1)
     denominator = valid_counts - ddof
-    variances = np.full(sx.shape[0], np.nan, dtype=np.float64)
+    variances = np.full(sx.shape[0], np.nan, dtype=DEFAULT_DATA_TYPE)
     np.divide(
         np.nansum((sx - means) ** 2, axis=1),
         denominator,
@@ -323,7 +327,7 @@ def _ts_prod(sx: np.ndarray) -> np.ndarray:
 
 
 def _ts_max(sx: np.ndarray) -> np.ndarray:
-    out = np.full(sx.shape[0], np.nan, dtype=np.float64)
+    out = np.full(sx.shape[0], np.nan, dtype=DEFAULT_DATA_TYPE)
     valid = ~np.all(np.isnan(sx), axis=1)
     if valid.any():
         out[valid] = np.nanmax(sx[valid], axis=1)
@@ -331,7 +335,7 @@ def _ts_max(sx: np.ndarray) -> np.ndarray:
 
 
 def _ts_min(sx: np.ndarray) -> np.ndarray:
-    out = np.full(sx.shape[0], np.nan, dtype=np.float64)
+    out = np.full(sx.shape[0], np.nan, dtype=DEFAULT_DATA_TYPE)
     valid = ~np.all(np.isnan(sx), axis=1)
     if valid.any():
         out[valid] = np.nanmin(sx[valid], axis=1)
@@ -339,23 +343,23 @@ def _ts_min(sx: np.ndarray) -> np.ndarray:
 
 
 def _ts_argmax(sx: np.ndarray) -> np.ndarray:
-    out = np.full(sx.shape[0], np.nan, dtype=np.float64)
+    out = np.full(sx.shape[0], np.nan, dtype=DEFAULT_DATA_TYPE)
     valid = ~np.all(np.isnan(sx), axis=1)
     if valid.any():
-        out[valid] = np.nanargmax(sx[valid], axis=1).astype(np.float64)
+        out[valid] = np.nanargmax(sx[valid], axis=1).astype(DEFAULT_DATA_TYPE)
     return out
 
 
 def _ts_argmin(sx: np.ndarray) -> np.ndarray:
-    out = np.full(sx.shape[0], np.nan, dtype=np.float64)
+    out = np.full(sx.shape[0], np.nan, dtype=DEFAULT_DATA_TYPE)
     valid = ~np.all(np.isnan(sx), axis=1)
     if valid.any():
-        out[valid] = np.nanargmin(sx[valid], axis=1).astype(np.float64)
+        out[valid] = np.nanargmin(sx[valid], axis=1).astype(DEFAULT_DATA_TYPE)
     return out
 
 
 def _ts_median(sx: np.ndarray) -> np.ndarray:
-    out = np.full(sx.shape[0], np.nan, dtype=np.float64)
+    out = np.full(sx.shape[0], np.nan, dtype=DEFAULT_DATA_TYPE)
     valid = ~np.all(np.isnan(sx), axis=1)
     if valid.any():
         out[valid] = np.nanmedian(sx[valid], axis=1)
@@ -381,7 +385,7 @@ def _ts_kurt(sx: np.ndarray) -> np.ndarray:
 def _ts_rank(sx: np.ndarray) -> np.ndarray:
     """Percentile rank of the latest value within the window."""
     latest = sx[:, -1]
-    rank = np.sum(sx <= latest[:, None], axis=1).astype(np.float64)
+    rank = np.sum(sx <= latest[:, None], axis=1).astype(DEFAULT_DATA_TYPE)
     return rank / sx.shape[1]
 
 
@@ -431,7 +435,7 @@ def _ema(x: np.ndarray, window: int) -> np.ndarray:
     """Exponential moving average along the last axis."""
     alpha = 2.0 / (window + 1)
     M, T = x.shape
-    out = np.empty_like(x, dtype=np.float64)
+    out = np.empty_like(x, dtype=DEFAULT_DATA_TYPE)
     out[:, 0] = x[:, 0]
     for t in range(1, T):
         out[:, t] = alpha * x[:, t] + (1 - alpha) * out[:, t - 1]
@@ -440,10 +444,10 @@ def _ema(x: np.ndarray, window: int) -> np.ndarray:
 
 def _wma(x: np.ndarray, window: int) -> np.ndarray:
     """Linearly-weighted moving average."""
-    weights = np.arange(1, window + 1, dtype=np.float64)
+    weights = np.arange(1, window + 1, dtype=DEFAULT_DATA_TYPE)
     weights /= weights.sum()
     M, T = x.shape
-    out = np.full_like(x, np.nan, dtype=np.float64)
+    out = np.full_like(x, np.nan, dtype=DEFAULT_DATA_TYPE)
     for t in range(window - 1, T):
         out[:, t] = (x[:, t - window + 1 : t + 1] * weights[None, :]).sum(axis=1)
     return out
@@ -454,7 +458,7 @@ def _decay(x: np.ndarray, window: int) -> np.ndarray:
     alpha = 2.0 / (window + 1)
     weights = np.array([alpha * (1 - alpha) ** i for i in range(window)][::-1])
     M, T = x.shape
-    out = np.full_like(x, np.nan, dtype=np.float64)
+    out = np.full_like(x, np.nan, dtype=DEFAULT_DATA_TYPE)
     for t in range(window - 1, T):
         out[:, t] = (x[:, t - window + 1 : t + 1] * weights[None, :]).sum(axis=1)
     return out
@@ -463,14 +467,14 @@ def _decay(x: np.ndarray, window: int) -> np.ndarray:
 def _cs_rank(x: np.ndarray) -> np.ndarray:
     """Cross-sectional percentile rank; break ties in asset row order."""
     M, T = x.shape
-    out = np.empty_like(x, dtype=np.float64)
+    out = np.empty_like(x, dtype=DEFAULT_DATA_TYPE)
     for t in range(T):
         col = x[:, t]
         valid = ~np.isnan(col)
-        ranked = np.empty(M, dtype=np.float64)
+        ranked = np.empty(M, dtype=DEFAULT_DATA_TYPE)
         ranked[:] = np.nan
         if valid.any():
-            order = col[valid].argsort(kind="stable").argsort().astype(np.float64)
+            order = col[valid].argsort(kind="stable").argsort().astype(DEFAULT_DATA_TYPE)
             ranked[valid] = (order + 1) / valid.sum()
         out[:, t] = ranked
     return out
@@ -478,7 +482,7 @@ def _cs_rank(x: np.ndarray) -> np.ndarray:
 
 def _cs_zscore(x: np.ndarray) -> np.ndarray:
     M, T = x.shape
-    out = np.full_like(x, np.nan, dtype=np.float64)
+    out = np.full_like(x, np.nan, dtype=DEFAULT_DATA_TYPE)
     for t in range(T):
         col = x[:, t]
         valid = ~np.isnan(col)
@@ -496,7 +500,7 @@ def _cs_zscore(x: np.ndarray) -> np.ndarray:
 
 def _cs_demean(x: np.ndarray) -> np.ndarray:
     valid_counts = np.sum(~np.isnan(x), axis=0, keepdims=True)
-    means = np.full((1, x.shape[1]), np.nan, dtype=np.float64)
+    means = np.full((1, x.shape[1]), np.nan, dtype=DEFAULT_DATA_TYPE)
     np.divide(
         np.nansum(x, axis=0, keepdims=True),
         valid_counts,
@@ -513,11 +517,11 @@ def _cs_scale(x: np.ndarray) -> np.ndarray:
 
 
 def _ts_linreg_slope(x: np.ndarray, window: int) -> np.ndarray:
-    t_vals = np.arange(window, dtype=np.float64)
+    t_vals = np.arange(window, dtype=DEFAULT_DATA_TYPE)
     t_mean = t_vals.mean()
     t_var = np.sum((t_vals - t_mean) ** 2)
     M, T = x.shape
-    out = np.full_like(x, np.nan, dtype=np.float64)
+    out = np.full_like(x, np.nan, dtype=DEFAULT_DATA_TYPE)
     for t in range(window - 1, T):
         sx = x[:, t - window + 1 : t + 1]
         x_mean = _row_nanmean(sx, keepdims=True)
@@ -528,11 +532,11 @@ def _ts_linreg_slope(x: np.ndarray, window: int) -> np.ndarray:
 
 
 def _ts_linreg_intercept(x: np.ndarray, window: int) -> np.ndarray:
-    t_vals = np.arange(window, dtype=np.float64)
+    t_vals = np.arange(window, dtype=DEFAULT_DATA_TYPE)
     t_mean = t_vals.mean()
     slope = _ts_linreg_slope(x, window)
     M, T = x.shape
-    out = np.full_like(x, np.nan, dtype=np.float64)
+    out = np.full_like(x, np.nan, dtype=DEFAULT_DATA_TYPE)
     for t in range(window - 1, T):
         sx = x[:, t - window + 1 : t + 1]
         x_mean = _row_nanmean(sx)
@@ -550,18 +554,18 @@ def _ts_linreg_fitted(x: np.ndarray, window: int) -> np.ndarray:
 def _ts_linreg_resid(x: np.ndarray, window: int) -> np.ndarray:
     fitted = _ts_linreg_fitted(x, window)
     M, T = x.shape
-    out = np.full_like(x, np.nan, dtype=np.float64)
+    out = np.full_like(x, np.nan, dtype=DEFAULT_DATA_TYPE)
     for t in range(window - 1, T):
         out[:, t] = x[:, t] - fitted[:, t]
     return out
 
 
 def _ts_linreg_rsquare(x: np.ndarray, window: int) -> np.ndarray:
-    t_vals = np.arange(window, dtype=np.float64)
+    t_vals = np.arange(window, dtype=DEFAULT_DATA_TYPE)
     t_mean = t_vals.mean()
     t_var = np.sum((t_vals - t_mean) ** 2)
     M, T = x.shape
-    out = np.full_like(x, np.nan, dtype=np.float64)
+    out = np.full_like(x, np.nan, dtype=DEFAULT_DATA_TYPE)
     for t in range(window - 1, T):
         sx = x[:, t - window + 1 : t + 1]
         x_mean = _row_nanmean(sx, keepdims=True)
@@ -671,36 +675,36 @@ def _dispatch_operator(
         return _rolling_apply(children[0], w, lambda sx: np.nanquantile(sx, q, axis=1))
     if name == "CountNaN":
         return _rolling_apply(
-            children[0], w, lambda sx: np.sum(np.isnan(sx), axis=1).astype(np.float64)
+            children[0], w, lambda sx: np.sum(np.isnan(sx), axis=1).astype(DEFAULT_DATA_TYPE)
         )
     if name == "CountNotNaN":
         return _rolling_apply(
-            children[0], w, lambda sx: np.sum(~np.isnan(sx), axis=1).astype(np.float64)
+            children[0], w, lambda sx: np.sum(~np.isnan(sx), axis=1).astype(DEFAULT_DATA_TYPE)
         )
 
     # -- Time-series --------------------------------------------------------
     if name == "Delta":
         M, T = children[0].shape
-        out = np.full_like(children[0], np.nan, dtype=np.float64)
+        out = np.full_like(children[0], np.nan, dtype=DEFAULT_DATA_TYPE)
         if w < T:
             out[:, w:] = children[0][:, w:] - children[0][:, :-w]
         return out
     if name == "Delay":
         M, T = children[0].shape
-        out = np.full_like(children[0], np.nan, dtype=np.float64)
+        out = np.full_like(children[0], np.nan, dtype=DEFAULT_DATA_TYPE)
         if w < T:
             out[:, w:] = children[0][:, :-w]
         return out
     if name == "Return":
         M, T = children[0].shape
-        out = np.full_like(children[0], np.nan, dtype=np.float64)
+        out = np.full_like(children[0], np.nan, dtype=DEFAULT_DATA_TYPE)
         if w < T:
             prev = children[0][:, :-w]
             out[:, w:] = _safe_div(children[0][:, w:] - prev, prev)
         return out
     if name == "LogReturn":
         M, T = children[0].shape
-        out = np.full_like(children[0], np.nan, dtype=np.float64)
+        out = np.full_like(children[0], np.nan, dtype=DEFAULT_DATA_TYPE)
         if w < T:
             ratio = _safe_div(
                 children[0][:, w:],
@@ -782,23 +786,23 @@ def _dispatch_operator(
         cond, x_true, x_false = children
         return np.where(cond > 0, x_true, x_false)
     if name == "Greater":
-        return (children[0] > children[1]).astype(np.float64)
+        return (children[0] > children[1]).astype(DEFAULT_DATA_TYPE)
     if name == "GreaterEqual":
-        return (children[0] >= children[1]).astype(np.float64)
+        return (children[0] >= children[1]).astype(DEFAULT_DATA_TYPE)
     if name == "Less":
-        return (children[0] < children[1]).astype(np.float64)
+        return (children[0] < children[1]).astype(DEFAULT_DATA_TYPE)
     if name == "LessEqual":
-        return (children[0] <= children[1]).astype(np.float64)
+        return (children[0] <= children[1]).astype(DEFAULT_DATA_TYPE)
     if name in {"Equal", "Eq"}:
-        return (np.abs(children[0] - children[1]) < _EPS).astype(np.float64)
+        return (np.abs(children[0] - children[1]) < _EPS).astype(DEFAULT_DATA_TYPE)
     if name == "Ne":
-        return (np.abs(children[0] - children[1]) >= _EPS).astype(np.float64)
+        return (np.abs(children[0] - children[1]) >= _EPS).astype(DEFAULT_DATA_TYPE)
     if name == "And":
-        return ((children[0] > 0) & (children[1] > 0)).astype(np.float64)
+        return ((children[0] > 0) & (children[1] > 0)).astype(DEFAULT_DATA_TYPE)
     if name == "Or":
-        return ((children[0] > 0) | (children[1] > 0)).astype(np.float64)
+        return ((children[0] > 0) | (children[1] > 0)).astype(DEFAULT_DATA_TYPE)
     if name == "Not":
-        return (children[0] <= 0).astype(np.float64)
+        return (children[0] <= 0).astype(DEFAULT_DATA_TYPE)
 
     raise NotImplementedError(f"Operator '{name}' has no evaluation implementation.")
 

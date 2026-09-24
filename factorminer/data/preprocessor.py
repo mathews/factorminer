@@ -71,7 +71,8 @@ class PreprocessConfig:
 
 def compute_vwap(df: pd.DataFrame) -> pd.DataFrame:
     """Add ``vwap`` column: amount / volume.  NaN when volume is zero."""
-    df = df.copy()
+    # df = df.copy()
+
     # df["vwap"] = np.where(
     #     df["volume"] > 0,
     #     df["amount"] / df["volume"],
@@ -92,7 +93,7 @@ def compute_returns(df: pd.DataFrame) -> pd.DataFrame:
     Returns are computed as ``close[t] / close[t-1] - 1`` within each asset.
     The first observation per asset is NaN.
     """
-    df = df.copy()
+    # df = df.copy()
     df = df.sort_values(["asset_id", "datetime"])
     df["returns"] = df.groupby("asset_id")["close"].pct_change()
     return df
@@ -120,7 +121,8 @@ def flag_halts(
     - Volume is exactly zero (or below *volume_threshold*), **and**
     - open == high == low == close (no price movement).
     """
-    df = df.copy()
+    # df = df.copy()
+
     zero_volume = df["volume"] <= volume_threshold
     flat_price = (df["open"] == df["high"]) & (df["high"] == df["low"]) & (df["low"] == df["close"])
     df["is_halt"] = zero_volume & flat_price
@@ -134,7 +136,7 @@ def mask_halts(df: pd.DataFrame) -> pd.DataFrame:
     """Set OHLCV and derived columns to NaN for halted bars."""
     if "is_halt" not in df.columns:
         return df
-    df = df.copy()
+    # df = df.copy()
     mask = df["is_halt"]
     cols_to_nan = [
         c
@@ -190,7 +192,8 @@ def fill_missing(
     columns : sequence of str, optional
         Columns to fill.  Defaults to numeric columns.
     """
-    df = df.copy()
+    # FIXME we disable copy here for mem cost
+    # df = df.copy()
     if columns is None:
         columns = df.select_dtypes(include=[np.number]).columns.tolist()
     columns = [c for c in columns if c in df.columns]
@@ -247,7 +250,7 @@ def winsorise(
     lower, upper : float
         Percentile bounds (0-100).
     """
-    df = df.copy()
+    # df = df.copy()
     columns = [c for c in columns if c in df.columns]
     if not columns:
         return df
@@ -281,16 +284,31 @@ def cross_sectional_standardise(
     ``x_std = (x - mean) / std`` where mean and std are computed across
     all assets at the same datetime.  Groups with std == 0 are set to 0.
     """
-    df = df.copy()
+    # df = df.copy()
     columns = [c for c in columns if c in df.columns]
 
-    for col in columns:
-        grp = df.groupby("datetime")[col]
-        mu = grp.transform("mean")
-        sigma = grp.transform("std")
-        sigma = sigma.replace(0, np.nan)
-        df[col] = (df[col] - mu) / sigma
-        df[col] = df[col].fillna(0.0)
+    # for col in columns:
+    #     grp = df.groupby("datetime")[col]
+    #     mu = grp.mean()
+    #     sigma = grp.transform("std")
+    #     sigma = sigma.replace(0, np.nan)
+    #     df[col] = (df[col] - mu) / sigma
+    #     df[col] = df[col].fillna(0.0)
+    # return df
+    # 按 datetime 分组，对所有目标列一次性计算组内均值和标准差
+    grp = df.groupby("datetime")[columns]
+    mu = grp.transform("mean")
+    sigma = grp.transform("std")
+
+    # 将标准差为 0 的项设为 NaN，避免除以 0
+    sigma = sigma.replace(0, np.nan)
+
+    # 向量化标准化
+    df[columns] = (df[columns] - mu) / sigma
+
+    # 将 NaN（包括原来 std=0 导致的）填为 0
+    df[columns] = df[columns].fillna(0.0)
+
     return df
 
 

@@ -445,8 +445,12 @@ def apply() -> bool:
     except ImportError:
         return False
     click.echo("===Monkeypatch the hot paths===")
-    dependence.SpearmanDependenceMetric.compute = lambda self, a, b: fast_spearman(a, b)
-    FactorLibrary.compute_correlation = lambda self, a, b: fast_spearman(a, b)
+    dependence.SpearmanDependenceMetric.compute = lambda self, signals_a, signals_b: fast_spearman(
+        signals_a, signals_b
+    )
+    FactorLibrary.compute_correlation = lambda self, signals_a, signals_b: fast_spearman(
+        signals_a, signals_b
+    )
 
     if not getattr(LibraryGeometry, "_fast_patched", False):
         original = LibraryGeometry.candidate_geometry

@@ -18,6 +18,7 @@ from factorminer.evaluation.metrics import (
     compute_factor_stats,
     compute_pairwise_correlation,
 )
+from factorminer.settings import DEFAULT_DATA_TYPE
 
 logger = logging.getLogger(__name__)
 
@@ -124,11 +125,9 @@ def build_runtime_dataset_from_arrays(
     is used by synthetic benchmarks and programmatic callers.  All feature and
     target panels must share the canonical ``(assets, periods)`` orientation.
     """
-    returns_array = np.asarray(returns, dtype=np.float64)
+    returns_array = np.asarray(returns, dtype=DEFAULT_DATA_TYPE)
     if returns_array.ndim != 2:
-        raise ValueError(
-            f"returns must have shape (assets, periods); got {returns_array.shape}"
-        )
+        raise ValueError(f"returns must have shape (assets, periods); got {returns_array.shape}")
     asset_count, period_count = returns_array.shape
 
     ordered_features = list(feature_order or data.keys())
@@ -140,7 +139,7 @@ def build_runtime_dataset_from_arrays(
 
     data_dict: dict[str, np.ndarray] = {}
     for name in ordered_features:
-        panel = np.asarray(data[name], dtype=np.float64)
+        panel = np.asarray(data[name], dtype=DEFAULT_DATA_TYPE)
         if panel.shape != returns_array.shape:
             raise ValueError(
                 f"feature {name!r} has shape {panel.shape}; expected {returns_array.shape}"
@@ -149,7 +148,7 @@ def build_runtime_dataset_from_arrays(
     data_tensor = np.stack([data_dict[name] for name in ordered_features], axis=2)
 
     targets = {
-        str(name): np.asarray(panel, dtype=np.float64)
+        str(name): np.asarray(panel, dtype=DEFAULT_DATA_TYPE)
         for name, panel in (target_panels or {default_target: returns_array}).items()
     }
     if default_target not in targets:
@@ -160,14 +159,10 @@ def build_runtime_dataset_from_arrays(
                 f"target {name!r} has shape {panel.shape}; expected {returns_array.shape}"
             )
 
-    timestamp_array = (
-        np.arange(period_count) if timestamps is None else np.asarray(timestamps)
-    )
+    timestamp_array = np.arange(period_count) if timestamps is None else np.asarray(timestamps)
     asset_array = np.arange(asset_count) if asset_ids is None else np.asarray(asset_ids)
     if timestamp_array.shape != (period_count,):
-        raise ValueError(
-            f"timestamps must have length {period_count}; got {timestamp_array.shape}"
-        )
+        raise ValueError(f"timestamps must have length {period_count}; got {timestamp_array.shape}")
     if asset_array.shape != (asset_count,):
         raise ValueError(f"asset_ids must have length {asset_count}; got {asset_array.shape}")
 
@@ -308,10 +303,10 @@ def load_runtime_dataset(
     )
     dataset = build_tensor(processed_df, tensor_cfg)
 
-    data_tensor = np.asarray(dataset.data, dtype=np.float64)
-    returns = np.asarray(dataset.target, dtype=np.float64)
+    data_tensor = np.asarray(dataset.data, dtype=DEFAULT_DATA_TYPE)
+    returns = np.asarray(dataset.target, dtype=DEFAULT_DATA_TYPE)
     target_panels = {
-        spec.name: np.asarray(dataset.targets[spec.column_name], dtype=np.float64)
+        spec.name: np.asarray(dataset.targets[spec.column_name], dtype=DEFAULT_DATA_TYPE)
         for spec in target_specs
         if spec.column_name in dataset.targets
     }
@@ -486,7 +481,7 @@ def evaluate_factors(
             artifacts.append(artifact)
             continue
 
-        signals = np.asarray(signals, dtype=np.float64)
+        signals = np.asarray(signals, dtype=DEFAULT_DATA_TYPE)
         if signal_dtype is not None and np.dtype(signal_dtype) != signals.dtype:
             signals = signals.astype(signal_dtype, copy=False)
         artifact.signals_ok = True
@@ -541,7 +536,7 @@ def compute_tree_signals(
             cause=SignalComputationError("Signal computation produced only NaN values"),
         )
 
-    return np.asarray(signals, dtype=np.float64)
+    return np.asarray(signals, dtype=DEFAULT_DATA_TYPE)
 
 
 def compute_correlation_matrix(
@@ -551,7 +546,7 @@ def compute_correlation_matrix(
     """Compute a true pairwise factor correlation matrix on one split."""
     selected = [a for a in artifacts if a.succeeded]
     n = len(selected)
-    matrix = np.zeros((n, n), dtype=np.float64)
+    matrix = np.zeros((n, n), dtype=DEFAULT_DATA_TYPE)
 
     for i in range(n):
         for j in range(i + 1, n):
@@ -641,8 +636,7 @@ def _build_named_split(
         timestamps=timestamps[indices],
         returns=returns[:, indices],
         target_returns={
-            target_name: panel[:, indices]
-            for target_name, panel in target_panels.items()
+            target_name: panel[:, indices] for target_name, panel in target_panels.items()
         },
         default_target=default_target,
     )
@@ -692,9 +686,7 @@ def _handle_signal_failure(
         ) from cause
 
     if signal_failure_policy != "synthetic":
-        raise ValueError(
-            "signal_failure_policy must be one of: reject, synthetic, raise"
-        )
+        raise ValueError("signal_failure_policy must be one of: reject, synthetic, raise")
 
     logger.warning(
         "Expression evaluation failed for '%s': %s — falling back to synthetic signals",
@@ -713,7 +705,7 @@ def generate_synthetic_signals(
     digest = hashlib.sha256(formula_str.encode("utf-8")).digest()
     seed = int.from_bytes(digest[:8], "big") % (2**31)
     rng = np.random.RandomState(seed)
-    signals = rng.randn(m, t).astype(np.float64)
+    signals = rng.randn(m, t).astype(DEFAULT_DATA_TYPE)
     nan_mask = rng.random((m, t)) < 0.02
     signals[nan_mask] = np.nan
     return signals

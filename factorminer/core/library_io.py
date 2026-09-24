@@ -7,6 +7,7 @@ CSV export, formula export, and import of the 110 factors from the paper.
 from __future__ import annotations
 
 import csv
+import gc
 import hashlib
 import json
 import logging
@@ -23,6 +24,7 @@ logger = logging.getLogger(__name__)
 # ======================================================================
 # Save / Load
 # ======================================================================
+
 
 def save_library(
     library: FactorLibrary,
@@ -78,8 +80,10 @@ def save_library(
             np.savez_compressed(npz_path, **signal_arrays)
             logger.info(
                 "Saved signal cache to %s (%d arrays)",
-                npz_path, len(signal_arrays),
+                npz_path,
+                len(signal_arrays),
             )
+            gc.collect()  # free memory after saving large arrays
 
 
 def load_library(path: str | Path) -> FactorLibrary:
@@ -116,15 +120,11 @@ def load_library(path: str | Path) -> FactorLibrary:
 
     # Restore correlation matrix
     if "correlation_matrix" in meta and meta["correlation_matrix"] is not None:
-        library.correlation_matrix = np.array(
-            meta["correlation_matrix"], dtype=np.float64
-        )
+        library.correlation_matrix = np.array(meta["correlation_matrix"], dtype=np.float64)
 
     # Restore id-to-index mapping
     if "id_to_index" in meta:
-        library._id_to_index = {
-            int(k): v for k, v in meta["id_to_index"].items()
-        }
+        library._id_to_index = {int(k): v for k, v in meta["id_to_index"].items()}
 
     # Load signal cache if present
     npz_path = Path(str(path) + "_signals.npz")
@@ -137,15 +137,14 @@ def load_library(path: str | Path) -> FactorLibrary:
         data.close()
         logger.info("Loaded signal cache from %s", npz_path)
 
-    logger.info(
-        "Loaded library from %s (%d factors)", json_path, library.size
-    )
+    logger.info("Loaded library from %s (%d factors)", json_path, library.size)
     return library
 
 
 # ======================================================================
 # Export utilities
 # ======================================================================
+
 
 def export_csv(library: FactorLibrary, path: str | Path) -> None:
     """Export the factor table to CSV.
@@ -157,30 +156,42 @@ def export_csv(library: FactorLibrary, path: str | Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
     fieldnames = [
-        "ID", "Name", "Formula", "Category", "IC_Mean", "Paper_IC",
-        "IC_Abs_Mean", "ICIR", "Paper_ICIR", "IC_Win_Rate", "Max_Correlation",
-        "Batch", "Admission_Date",
+        "ID",
+        "Name",
+        "Formula",
+        "Category",
+        "IC_Mean",
+        "Paper_IC",
+        "IC_Abs_Mean",
+        "ICIR",
+        "Paper_ICIR",
+        "IC_Win_Rate",
+        "Max_Correlation",
+        "Batch",
+        "Admission_Date",
     ]
 
     with open(path, "w", newline="") as fp:
         writer = csv.DictWriter(fp, fieldnames=fieldnames)
         writer.writeheader()
         for f in library.list_factors():
-            writer.writerow({
-                "ID": f.id,
-                "Name": f.name,
-                "Formula": f.formula,
-                "Category": f.category,
-                "IC_Mean": f"{f.ic_mean:.6f}",
-                "Paper_IC": f"{float(f.ic_paper_mean or 0.0):.6f}",
-                "IC_Abs_Mean": f"{float(f.ic_abs_mean or 0.0):.6f}",
-                "ICIR": f"{f.icir:.6f}",
-                "Paper_ICIR": f"{float(f.ic_paper_icir or 0.0):.6f}",
-                "IC_Win_Rate": f"{f.ic_win_rate:.4f}",
-                "Max_Correlation": f"{f.max_correlation:.4f}",
-                "Batch": f.batch_number,
-                "Admission_Date": f.admission_date,
-            })
+            writer.writerow(
+                {
+                    "ID": f.id,
+                    "Name": f.name,
+                    "Formula": f.formula,
+                    "Category": f.category,
+                    "IC_Mean": f"{f.ic_mean:.6f}",
+                    "Paper_IC": f"{float(f.ic_paper_mean or 0.0):.6f}",
+                    "IC_Abs_Mean": f"{float(f.ic_abs_mean or 0.0):.6f}",
+                    "ICIR": f"{f.icir:.6f}",
+                    "Paper_ICIR": f"{float(f.ic_paper_icir or 0.0):.6f}",
+                    "IC_Win_Rate": f"{f.ic_win_rate:.4f}",
+                    "Max_Correlation": f"{f.max_correlation:.4f}",
+                    "Batch": f.batch_number,
+                    "Admission_Date": f.admission_date,
+                }
+            )
 
     logger.info("Exported %d factors to %s", library.size, path)
 
@@ -210,9 +221,19 @@ def export_formulas(library: FactorLibrary, path: str | Path) -> None:
 # ======================================================================
 
 _ANONYMIZED_FIELDNAMES = [
-    "factor_id", "name", "family", "formula_hash",
-    "ic_mean", "ic_paper_mean", "ic_abs_mean", "icir", "ic_paper_icir",
-    "ic_win_rate", "max_correlation", "batch_number", "admission_date",
+    "factor_id",
+    "name",
+    "family",
+    "formula_hash",
+    "ic_mean",
+    "ic_paper_mean",
+    "ic_abs_mean",
+    "icir",
+    "ic_paper_icir",
+    "ic_win_rate",
+    "max_correlation",
+    "batch_number",
+    "admission_date",
 ]
 
 
@@ -273,9 +294,7 @@ def export_anonymized(library: FactorLibrary, path: str | Path, *, fmt: str = "c
             f"Unsupported anonymized export format: {fmt!r}. Expected 'csv' or 'json'."
         )
 
-    logger.info(
-        "Exported %d anonymized factors to %s (fmt=%s)", library.size, path, fmt
-    )
+    logger.info("Exported %d anonymized factors to %s (fmt=%s)", library.size, path, fmt)
 
 
 # ======================================================================

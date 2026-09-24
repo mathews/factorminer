@@ -7,9 +7,13 @@ factor statistics used by the validation pipeline.
 
 from __future__ import annotations
 
+import gc
+
 import numpy as np
 import pandas as pd
 from scipy.stats import rankdata
+
+from factorminer.settings import DEFAULT_DATA_TYPE
 
 # ---------------------------------------------------------------------------
 # Information Coefficient
@@ -20,8 +24,8 @@ _EVALUATION_BLOCK_SIZE = 128
 
 def _validate_panel_pair(signals: np.ndarray, returns: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Return two aligned floating-point ``(assets, periods)`` panels."""
-    signal_panel = np.asarray(signals, dtype=np.float64)
-    return_panel = np.asarray(returns, dtype=np.float64)
+    signal_panel = np.asarray(signals, dtype=DEFAULT_DATA_TYPE)
+    return_panel = np.asarray(returns, dtype=DEFAULT_DATA_TYPE)
     if signal_panel.ndim != 2 or return_panel.ndim != 2:
         raise ValueError("signals and returns must both be 2-D (assets, periods) panels")
     if signal_panel.shape != return_panel.shape:
@@ -34,8 +38,10 @@ def _validate_panel_pair(signals: np.ndarray, returns: np.ndarray) -> tuple[np.n
 
 def _column_average_ranks(values: np.ndarray) -> np.ndarray:
     """Return average ranks per column while retaining missing entries."""
-    return pd.DataFrame(values).rank(method="average", na_option="keep").to_numpy(
-        dtype=np.float64, copy=False
+    return (
+        pd.DataFrame(values)
+        .rank(method="average", na_option="keep")
+        .to_numpy(dtype=DEFAULT_DATA_TYPE, copy=False)
     )
 
 
@@ -48,7 +54,8 @@ def _compute_cross_sectional_correlation(
 ) -> np.ndarray:
     """Compute a Pearson correlation, optionally after ranking each cross-section."""
     signal_panel, return_panel = _validate_panel_pair(signals, returns)
-    series = np.full(signal_panel.shape[1], np.nan, dtype=np.float64)
+    gc.collect()
+    series = np.full(signal_panel.shape[1], np.nan, dtype=DEFAULT_DATA_TYPE)
     for start in range(0, signal_panel.shape[1], _EVALUATION_BLOCK_SIZE):
         stop = start + _EVALUATION_BLOCK_SIZE
         left_block = signal_panel[:, start:stop]
@@ -67,21 +74,19 @@ def _compute_cross_sectional_correlation(
         left_mean = np.divide(
             left_values.sum(axis=0),
             observations,
-            out=np.zeros_like(observations, dtype=np.float64),
+            out=np.zeros_like(observations, dtype=DEFAULT_DATA_TYPE),
             where=observations > 0,
         )
         right_mean = np.divide(
             right_values.sum(axis=0),
             observations,
-            out=np.zeros_like(observations, dtype=np.float64),
+            out=np.zeros_like(observations, dtype=DEFAULT_DATA_TYPE),
             where=observations > 0,
         )
         left_centered = np.where(valid, left - left_mean, 0.0)
         right_centered = np.where(valid, right - right_mean, 0.0)
         numerator = np.sum(left_centered * right_centered, axis=0)
-        denominator = np.sqrt(
-            np.sum(left_centered**2, axis=0) * np.sum(right_centered**2, axis=0)
-        )
+        denominator = np.sqrt(np.sum(left_centered**2, axis=0) * np.sum(right_centered**2, axis=0))
         correlation = np.divide(
             numerator,
             denominator,
@@ -101,12 +106,17 @@ def compute_pearson_ic(signals: np.ndarray, returns: np.ndarray) -> np.ndarray:
     separate from :func:`compute_rank_ic` because the two answer different
     questions and are reported separately by Qlib/AlphaBench-style tooling.
     """
-    return _compute_cross_sectional_correlation(signals, returns, rank=False)
+    out = _compute_cross_sectional_correlation(signals, returns, rank=False)
+    gc.collect()
+    return out
 
 
 def compute_rank_ic(signals: np.ndarray, returns: np.ndarray) -> np.ndarray:
     """Compute cross-sectional Spearman RankIC for each period."""
-    return _compute_cross_sectional_correlation(signals, returns, rank=True)
+    out = _compute_cross_sectional_correlation(signals, returns, rank=True)
+    gc.collect()
+
+    return out
 
 
 def compute_ic(signals: np.ndarray, returns: np.ndarray) -> np.ndarray:
@@ -292,7 +302,7 @@ def compute_quintile_returns(
     _, period_count = signals.shape
     n_quantiles = int(n_quantiles)
     result: dict = {}
-    return_sums = np.zeros(n_quantiles, dtype=np.float64)
+    return_sums = np.zeros(n_quantiles, dtype=DEFAULT_DATA_TYPE)
     return_counts = np.zeros(n_quantiles, dtype=np.int64)
     for start in range(0, period_count, _EVALUATION_BLOCK_SIZE):
         stop = start + _EVALUATION_BLOCK_SIZE
@@ -316,16 +326,14 @@ def compute_quintile_returns(
         for q in range(1, n_quantiles + 1):
             members = quantile_labels == q
             has_members = members.any(axis=0)
-            finite_returns = np.all(
-                np.where(members, np.isfinite(return_block), True), axis=0
-            )
+            finite_returns = np.all(np.where(members, np.isfinite(return_block), True), axis=0)
             take = usable_period & has_members & finite_returns
             totals = np.where(members, return_block, 0.0).sum(axis=0)
             counts = members.sum(axis=0)
             period_returns = np.divide(
                 totals,
                 counts,
-                out=np.zeros(signal_block.shape[1], dtype=np.float64),
+                out=np.zeros(signal_block.shape[1], dtype=DEFAULT_DATA_TYPE),
                 where=counts > 0,
             )
             return_sums[q - 1] += period_returns[take].sum()
@@ -333,18 +341,14 @@ def compute_quintile_returns(
 
     means: dict[int, float] = {}
     for q in range(1, n_quantiles + 1):
-        means[q] = (
-            float(return_sums[q - 1] / return_counts[q - 1])
-            if return_counts[q - 1]
-            else 0.0
-        )
+        means[q] = float(return_sums[q - 1] / return_counts[q - 1]) if return_counts[q - 1] else 0.0
         result[f"Q{q}"] = means[q]
 
     # Long-short: top quintile minus bottom quintile
     result["long_short"] = means[n_quantiles] - means[1]
 
     # Monotonicity: Spearman corr between quintile index and mean return
-    q_indices = np.arange(1, n_quantiles + 1, dtype=np.float64)
+    q_indices = np.arange(1, n_quantiles + 1, dtype=DEFAULT_DATA_TYPE)
     q_returns = np.array([means[q] for q in range(1, n_quantiles + 1)])
     if np.std(q_returns) < 1e-12:
         result["monotonicity"] = 0.0
@@ -396,9 +400,7 @@ def compute_turnover(signals: np.ndarray, top_fraction: float = 0.2) -> float:
         block = signals[:, start : start + 64]
         valid = np.isfinite(block)
         usable = valid.sum(axis=0) >= k
-        top_idx = np.argpartition(
-            np.where(valid, block, -np.inf), -k, axis=0
-        )[-k:, :]
+        top_idx = np.argpartition(np.where(valid, block, -np.inf), -k, axis=0)[-k:, :]
         selected = np.zeros_like(valid)
         selected[top_idx, np.arange(block.shape[1])[None, :]] = True
 

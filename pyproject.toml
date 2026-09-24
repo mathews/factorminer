@@ -35,21 +35,21 @@ dependencies = [
     "networkx",
     "sympy",
     "fastparquet",
-    "xgboost-cpu",
+    # "xgboost",
 ]
 
 [project.optional-dependencies]
 gpu = [
-    "torch>=2.13",
-    "cupy-cuda12x>=14.2; platform_system == 'Linux'",
+    "torch==2.7.0",
+    # "cupy-cuda12x>=14.2; platform_system == 'Linux'",
 ]
 llm = [
     "openai",
-    "anthropic",
-    "google-generativeai",
+    # "anthropic",
+    # "google-generativeai",
 ]
 embeddings = [
-    "torch>=2.13",
+    "torch>=2.7.0",
     "sentence-transformers>=2.0",
     "faiss-cpu>=1.7",
 ]
@@ -58,7 +58,7 @@ research = [
     "statsmodels>=0.14.0",
 ]
 ml = [
-    "torch>=2.13",
+    "torch>=2.7.0",
     "xgboost>=2.0",
 ]
 visualization = [
@@ -72,13 +72,13 @@ mcp = [
 dev = [
     "pytest>=7.0",
     "pytest-cov",
-    "ruff",
-    "mypy",
-    "basedpyright",
+    # "ruff",
+    # "mypy",
+    # "basedpyright",
 ]
 all = [
     "cupy-cuda12x>=14.2; platform_system == 'Linux'",
-    "torch>=2.13",
+    "torch>=2.7.0",
     "openai",
     "anthropic",
     "google-generativeai",
