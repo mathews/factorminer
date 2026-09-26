@@ -50,7 +50,7 @@ mining:
 # ---------------------------------------------------------------------------
 evaluation:
   # Number of parallel workers for factor evaluation
-  num_workers: 4
+  num_workers: 8
 
   # Number of assets used in fast IC screening (Stage 1)
   fast_screen_assets: 500

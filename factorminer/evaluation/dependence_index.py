@@ -172,10 +172,12 @@ class DependenceIndex:
             if not np.any(usable):
                 continue
             mask = valid[:, usable]
-            ranked_a = self._joint_ranks(signals_a[:, window], prepared_a.ranks[:, window],
-                                         own_a, mask, usable)
-            ranked_b = self._joint_ranks(signals_b[:, window], prepared_b.ranks[:, window],
-                                         own_b, mask, usable)
+            ranked_a = self._joint_ranks(
+                signals_a[:, window], prepared_a.ranks[:, window], own_a, mask, usable
+            )
+            ranked_b = self._joint_ranks(
+                signals_b[:, window], prepared_b.ranks[:, window], own_b, mask, usable
+            )
             # From here on this is SpearmanDependenceMetric.compute verbatim,
             # applied to identical arrays with identical memory layout.
             ranked_a -= np.nanmean(ranked_a, axis=0)
@@ -183,9 +185,7 @@ class DependenceIndex:
             np.nan_to_num(ranked_a, copy=False, nan=0.0)
             np.nan_to_num(ranked_b, copy=False, nan=0.0)
             numerator = np.sum(ranked_a * ranked_b, axis=0)
-            denominator = np.sqrt(
-                np.sum(ranked_a**2, axis=0) * np.sum(ranked_b**2, axis=0)
-            )
+            denominator = np.sqrt(np.sum(ranked_a**2, axis=0) * np.sum(ranked_b**2, axis=0))
             correlations = np.divide(
                 np.abs(numerator),
                 denominator,
@@ -196,7 +196,7 @@ class DependenceIndex:
             period_count += int(correlations.size)
         return correlation_sum / period_count if period_count else 0.0
 
-    def _joint_ranks(
+    def _joint_ranks0(
         self,
         signals: np.ndarray,
         own_ranks: np.ndarray,
@@ -214,6 +214,60 @@ class DependenceIndex:
                 np.where(mask[:, stale], columns, np.nan), axis=0, nan_policy="omit"
             )
         return ranks
+
+    def _joint_ranks(
+        self,
+        signals: np.ndarray,
+        own_ranks: np.ndarray,
+        own_valid: np.ndarray,
+        mask: np.ndarray,
+        usable: np.ndarray,
+    ) -> np.ndarray:
+        """
+        Return ranks on the joint mask, in ``rankdata``'s (Fortran) layout.
+
+        Memory-efficient version:
+          - Avoids large intermediate copies.
+          - Calls rankdata column-by-column instead of on a big 2D block.
+          - Only converts to Fortran order if really needed.
+        """
+        # 1) 选取 usable 列的视图，不拷贝
+        ranks_view = own_ranks[:, usable]  # shape: (T, N_usable)
+
+        # 2) 判断哪些列需要重新排名
+        stale = np.any(own_valid[:, usable] != mask, axis=0)  # (N_usable,)
+        if not np.any(stale):
+            # 没有需要重排的列，直接返回一个 Fortran 布局的拷贝（如果下游需要）
+            # 如果下游可以接受 C-order，可以跳过 asfortranarray
+            return np.asfortranarray(ranks_view)
+
+        self.reranked_periods += int(stale.sum())
+
+        # 3) 只对 stale 列逐列重排，避免构造大的 2D 临时数组
+        #    signals[:, usable][:, stale] 等价于 signals[:, usable[stale]]
+        usable_cols = usable[stale]
+        T = signals.shape[0]
+
+        # 确保输出是 float64 或适合 rankdata 的类型，再转回目标 dtype
+        # 这里假设 own_ranks 是 float32 或 float64；如需严格 float32，可在最后转换
+        out_col = np.empty(T, dtype=np.float64)
+
+        for j, col_idx in enumerate(usable_cols):
+            col = signals[:, col_idx]
+            # 应用 mask：mask 是 (T, N_total)，这里用 mask[:, col_idx]
+            m = mask[:, col_idx]
+            # 构造带 NaN 的列：只在 mask=True 的位置有数据
+            masked_col = np.where(m, col, np.nan)
+
+            # 逐列调用 rankdata，nan_policy="omit" 等价于原来行为
+            ranks_col = rankdata(masked_col, axis=None, nan_policy="omit")
+
+            # 写回 ranks_view 的对应列
+            ranks_view[:, j] = ranks_col
+
+        # 4) 如需 Fortran 布局，再统一转换一次（只在必要时）
+        #    如果 ranks_view 已经 F-contiguous，asfortranarray 不会拷贝
+        return np.asfortranarray(ranks_view)
 
     def stats(self) -> dict[str, int | None]:
         with self._lock:

@@ -36,19 +36,45 @@ OPERATOR_SEMANTICS_VERSION = "numpy-expression-v1"
 # Operators whose output at t depends on inputs t-(window-1)..t.
 _ROLLING_WINDOW_OPERATORS = frozenset(
     {
-        "Mean", "Std", "Var", "Skew", "Kurt", "Median", "Med", "Sum", "Prod",
-        "Product", "TsMax", "TsMin", "TsArgMax", "TsArgMin", "TsRank", "Quantile",
-        "CountNaN", "CountNotNaN", "Corr", "Cov", "Beta", "Resid", "SMA", "WMA",
-        "Decay", "TsDecay", "TsLinReg", "TsLinRegSlope", "Slope",
-        "TsLinRegIntercept", "TsLinRegResid", "Resi", "Rsquare",
+        "Mean",
+        "Std",
+        "Var",
+        "Skew",
+        "Kurt",
+        "Median",
+        "Med",
+        "Sum",
+        "Prod",
+        "Product",
+        "TsMax",
+        "TsMin",
+        "TsArgMax",
+        "TsArgMin",
+        "TsRank",
+        "Quantile",
+        "CountNaN",
+        "CountNotNaN",
+        "Corr",
+        "Cov",
+        "Beta",
+        "Resid",
+        "SMA",
+        "WMA",
+        "Decay",
+        "TsDecay",
+        "TsLinReg",
+        "TsLinRegSlope",
+        "Slope",
+        "TsLinRegIntercept",
+        "TsLinRegResid",
+        "Resi",
+        "Rsquare",
     }
 )
 # Operators whose output at t depends on inputs t-window and t.
 _LAG_OPERATORS = frozenset({"Delta", "Delay", "Return", "LogReturn"})
 # Operators with unbounded memory: output at t depends on all prior inputs.
-_UNBOUNDED_OPERATORS = frozenset(
-    {"EMA", "DEMA", "KAMA", "CumSum", "CumProd", "CumMax", "CumMin"}
-)
+_UNBOUNDED_OPERATORS = frozenset({"EMA", "DEMA", "KAMA", "CumSum", "CumProd", "CumMax", "CumMin"})
 
 
 @dataclass(frozen=True)
@@ -80,10 +106,11 @@ class PlanStep:
                     f"Feature '{self.leaf_name}' not found in data. "
                     f"Available: {sorted(data.keys())}"
                 )
-            return data[self.leaf_name].astype(np.float64, copy=False)
+            # return data[self.leaf_name].astype(np.float64, copy=False)
+            return data[self.leaf_name]
         if self.kind == "constant":
             for panel in data.values():
-                return np.full_like(panel, self.constant, dtype=np.float64)
+                return np.full_like(panel, self.constant, dtype=np.float32)
             raise ValueError("Cannot evaluate ConstantNode with empty data dict.")
         result: np.ndarray = self.node.evaluate(data)
         return result
@@ -131,9 +158,7 @@ class _Compiler:
         if isinstance(node, LeafNode):
             return self._intern(
                 _hash("leaf", node.feature_name),
-                lambda digest: PlanStep(
-                    digest, "leaf", (), 0, False, leaf_name=node.feature_name
-                ),
+                lambda digest: PlanStep(digest, "leaf", (), 0, False, leaf_name=node.feature_name),
             )
         if isinstance(node, ConstantNode):
             return self._intern(
@@ -159,8 +184,13 @@ class _Compiler:
             return self._intern(
                 digest,
                 lambda digest: PlanStep(
-                    digest, "operator", inputs, lookback, cross_sectional,
-                    operator=node.operator, params=params,
+                    digest,
+                    "operator",
+                    inputs,
+                    lookback,
+                    cross_sectional,
+                    operator=node.operator,
+                    params=params,
                 ),
             )
         # Duck-typed nodes (e.g. neural leaves) are opaque: evaluated as a unit,
@@ -202,7 +232,7 @@ class ExpressionPlan:
     def evaluate(self, data: Mapping[str, np.ndarray]) -> np.ndarray:
         """Evaluate the formula; identical to ``ExpressionTree.evaluate``."""
         batch = BatchPlan(plans=(self,), steps=self.steps, outputs=(self.output,))
-        (_, value), = batch.iter_outputs(data)
+        ((_, value),) = batch.iter_outputs(data)
         if isinstance(value, BaseException):
             raise value
         result: np.ndarray = value
@@ -232,9 +262,16 @@ def _plan_from_steps(root: Any, steps: tuple[PlanStep, ...], output: int) -> Exp
     remap = {old: new for new, old in enumerate(ordered)}
     local = tuple(
         PlanStep(
-            step.digest, step.kind, tuple(remap[i] for i in step.inputs), step.lookback,
-            step.cross_sectional, step.node, step.operator, step.params,
-            step.leaf_name, step.constant,
+            step.digest,
+            step.kind,
+            tuple(remap[i] for i in step.inputs),
+            step.lookback,
+            step.cross_sectional,
+            step.node,
+            step.operator,
+            step.params,
+            step.leaf_name,
+            step.constant,
         )
         for step in (steps[i] for i in ordered)
     )
@@ -243,9 +280,7 @@ def _plan_from_steps(root: Any, steps: tuple[PlanStep, ...], output: int) -> Exp
         formula=root.to_string(),
         steps=local,
         output=remap[output],
-        required_features=frozenset(
-            step.leaf_name for step in local if step.kind == "leaf"
-        ),
+        required_features=frozenset(step.leaf_name for step in local if step.kind == "leaf"),
         max_lookback=out.lookback,
         cross_sectional=out.cross_sectional,
         digest=_hash(OPERATOR_SEMANTICS_VERSION, out.digest),

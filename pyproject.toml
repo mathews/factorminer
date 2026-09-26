@@ -102,7 +102,8 @@ dev = [
     "pytest>=7.0",
     "pytest-cov",
     "ruff",
-    "mypy",
+    # "mypy",
+    "scalene",
 ]
 
 [project.scripts]

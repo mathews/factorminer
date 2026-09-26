@@ -226,7 +226,7 @@ def _safe_div(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     ``np.where`` evaluates the division on invalid elements before masking it.
     """
     mask = np.abs(b) > _EPS
-    out = np.zeros(np.broadcast_shapes(np.shape(a), np.shape(b)), dtype=np.float64)
+    out = np.zeros(np.broadcast_shapes(np.shape(a), np.shape(b)), dtype=np.float32)
     np.divide(a, b, out=out, where=mask)
     return out
 

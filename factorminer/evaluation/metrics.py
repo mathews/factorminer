@@ -24,8 +24,10 @@ _EVALUATION_BLOCK_SIZE = 128
 
 def _validate_panel_pair(signals: np.ndarray, returns: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Return two aligned floating-point ``(assets, periods)`` panels."""
-    signal_panel = np.asarray(signals, dtype=DEFAULT_DATA_TYPE)
-    return_panel = np.asarray(returns, dtype=DEFAULT_DATA_TYPE)
+    # signal_panel = np.asarray(signals, dtype=DEFAULT_DATA_TYPE)
+    # return_panel = np.asarray(returns, dtype=DEFAULT_DATA_TYPE)
+    signal_panel: np.ndarray = signals
+    return_panel: np.ndarray = returns
     if signal_panel.ndim != 2 or return_panel.ndim != 2:
         raise ValueError("signals and returns must both be 2-D (assets, periods) panels")
     if signal_panel.shape != return_panel.shape:
@@ -38,10 +40,15 @@ def _validate_panel_pair(signals: np.ndarray, returns: np.ndarray) -> tuple[np.n
 
 def _column_average_ranks(values: np.ndarray) -> np.ndarray:
     """Return average ranks per column while retaining missing entries."""
-    return (
-        pd.DataFrame(values)
-        .rank(method="average", na_option="keep")
-        .to_numpy(dtype=DEFAULT_DATA_TYPE, copy=False)
+    # return (
+    #     pd.DataFrame(values)
+    #     .rank(method="average", na_option="keep")
+    #     .to_numpy(dtype=DEFAULT_DATA_TYPE, copy=False)
+    # )
+    return np.apply_along_axis(
+        lambda col: rankdata(col, method="average", nan_policy="propagate"),
+        axis=0,
+        arr=values,
     )
 
 
@@ -83,8 +90,15 @@ def _compute_cross_sectional_correlation(
             out=np.zeros_like(observations, dtype=DEFAULT_DATA_TYPE),
             where=observations > 0,
         )
-        left_centered = np.where(valid, left - left_mean, 0.0)
-        right_centered = np.where(valid, right - right_mean, 0.0)
+        # left_centered = np.where(valid, left - left_mean, 0.0)
+        # 假设 left 之后不再需要原始值，可以就地中心化
+        left_centered = left - left_mean  # 这里仍会分配一个新数组 tmp
+        left_centered[~valid] = 0.0  # 就地修改，不再额外分配大数组
+
+        # right_centered = np.where(valid, right - right_mean, 0.0)
+        right_centered = right - right_mean  # 这里仍会分配一个新数组 tmp
+        right_centered[~valid] = 0.0
+
         numerator = np.sum(left_centered * right_centered, axis=0)
         denominator = np.sqrt(np.sum(left_centered**2, axis=0) * np.sum(right_centered**2, axis=0))
         correlation = np.divide(

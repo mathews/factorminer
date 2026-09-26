@@ -569,7 +569,8 @@ def _finalize_signals(
             cause=SignalComputationError("Signal computation produced only NaN values"),
         )
 
-    return np.asarray(value, dtype=np.float64)
+    # return np.asarray(value, dtype=np.float64)
+    return value
 
 
 def compute_correlation_matrix(
