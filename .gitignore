@@ -13,3 +13,8 @@ dist/
 output/
 results/
 docs/_build/
+.clawhub/
+agent.md
+skills/
+
+
