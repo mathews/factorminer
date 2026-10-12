@@ -140,7 +140,11 @@ class NetCostResult:
     impact_estimate : MarketImpactEstimate
         Detailed impact statistics.
     passes_net_threshold : bool
-        ``True`` if ``net_icir >= config.net_icir_threshold``.
+        ``True`` if ``|net_icir| >= config.net_icir_threshold``. The absolute
+        value is used because the library admits on ``|IC|`` (see
+        ``metrics.compute_ic_paper_icir``): a factor mined with a negative
+        signal-return correlation is simply traded in reverse, so its cost
+        survival must be judged on magnitude, not raw sign.
     """
 
     factor_name: str
@@ -478,7 +482,7 @@ class CapacityEstimator:
             net_ls_return=net_ls,
             estimated_capacity_usd=cap,
             impact_estimate=impact,
-            passes_net_threshold=net_icir >= self.config.net_icir_threshold,
+            passes_net_threshold=abs(net_icir) >= self.config.net_icir_threshold,
         )
 
     # ------------------------------------------------------------------

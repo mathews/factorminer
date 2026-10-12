@@ -166,3 +166,41 @@ def test_zero_volume_handling(rng):
     assert not np.any(np.isnan(result.impact_bps))
     cfg = CapacityConfig()
     assert np.allclose(result.participation_rate, cfg.participation_limit)
+
+
+def test_net_threshold_uses_absolute_icir(rng):
+    """passes_net_threshold must judge |net_icir|, not the signed value.
+
+    The library admits on |IC| (``metrics.compute_ic_paper_icir``), so a
+    factor whose signal-return correlation is negative is simply traded in
+    reverse. Comparing the *signed* net_icir against a positive threshold
+    rejected every such factor by construction -- roughly two thirds of a
+    |IC|-admitted library -- regardless of how well it survived costs.
+    """
+    M, T = 40, 200
+    true_alpha = rng.normal(size=(M, 1)) * np.ones((1, T))
+    returns = 0.5 * true_alpha + 0.5 * rng.normal(size=(M, T)) * 0.01
+    volume = np.abs(rng.normal(1e8, 1e7, (M, T)))
+
+    config = CapacityConfig(net_icir_threshold=0.05)
+    estimator = CapacityEstimator(returns=returns, volume=volume, config=config)
+
+    signals = true_alpha + 0.3 * rng.normal(size=(M, T))
+    positive = estimator.net_cost_evaluation("pos", signals, capital=1e6)
+    flipped = estimator.net_cost_evaluation("neg", -signals, capital=1e6)
+
+    # Flipping the signal negates net_icir (up to the cost leg's asymmetry)
+    # but must not change the verdict.
+    assert flipped.net_icir == pytest.approx(-positive.net_icir, rel=0.01)
+    assert flipped.passes_net_threshold == positive.passes_net_threshold
+    assert positive.passes_net_threshold is True
+
+    # Under the old signed comparison the flipped factor was rejected purely
+    # for being negative; magnitude-based gating must accept it.
+    assert positive.net_icir >= config.net_icir_threshold
+    assert flipped.net_icir <= -config.net_icir_threshold
+
+    # And the gate really is on magnitude.
+    assert positive.passes_net_threshold == (
+        abs(positive.net_icir) >= config.net_icir_threshold
+    )

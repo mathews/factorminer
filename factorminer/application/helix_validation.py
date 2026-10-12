@@ -193,7 +193,7 @@ class HelixValidationService:
                     self.revoke(
                         r,
                         all_results,
-                        f"Capacity: net_icir={result.net_icir:.3f} < {net_icir_threshold}",
+                        f"Capacity: |net_icir|={abs(result.net_icir):.3f} < {net_icir_threshold}",
                     )
                     rejected += 1
                     logger.debug(

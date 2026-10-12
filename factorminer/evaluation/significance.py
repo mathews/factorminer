@@ -17,6 +17,8 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.stats import kurtosis, norm, skew
 
+EULER_MASCHERONI = 0.5772156649015328606
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -403,6 +405,13 @@ class DeflatedSharpeCalculator:
     ) -> DeflatedSharpeResult:
         """Compute the Deflated Sharpe Ratio for a factor's L/S returns.
 
+        ``deflated_sharpe`` is the standardised statistic
+        ``(SR_hat - E[max SR]) / sqrt(Var(SR_hat))`` with the Sharpe and its
+        expected maximum both in *per-period* units, as in Bailey & Lopez de
+        Prado (2014). A zero-skill strategy that happens to be the best of
+        ``n_trials`` therefore deflates to approximately zero. ``raw_sharpe``
+        and ``haircut`` remain annualised.
+
         Parameters
         ----------
         factor_name : str
@@ -445,10 +454,12 @@ class DeflatedSharpeCalculator:
                 passes=False,
             )
 
-        SR = (mean_r / std_r) * math.sqrt(annualization_factor)
-
-        # Expected maximum SR under the null (Bailey & LdP, 2014)
-        e_max_sr = self._expected_max_sr(n_trials)
+        # Per-period Sharpe, as Bailey & Lopez de Prado define SR_hat. The
+        # skew/kurtosis variance correction and the expected-maximum term are
+        # only mutually consistent in these non-annualised units.
+        sr_per_period = mean_r / std_r
+        # Annualised Sharpe, reported for continuity with existing artifacts.
+        SR = sr_per_period * math.sqrt(annualization_factor)
 
         # Higher moments of returns
         gamma3 = float(skew(valid, bias=False))
@@ -461,25 +472,40 @@ class DeflatedSharpeCalculator:
         # series) and make the deflation systematically too permissive.
         gamma4 = float(kurtosis(valid, fisher=False, bias=False))  # raw kurtosis
 
-        # Variance correction incorporating skewness and kurtosis
-        var_correction = (1.0 - gamma3 * SR + (gamma4 - 1.0) / 4.0 * SR ** 2) / T
+        # Variance of the Sharpe estimator (B&LdP 2014), in per-period units.
+        var_correction = (
+            1.0 - gamma3 * sr_per_period + (gamma4 - 1.0) / 4.0 * sr_per_period ** 2
+        ) / T
 
         if var_correction <= 0:
-            deflated_sr = 0.0
+            dsr_prob = 0.0
+            e_max_sr = 0.0
         else:
-            deflated_sr = (SR - e_max_sr) / math.sqrt(var_correction)
+            sharpe_standard_error = math.sqrt(var_correction)
+            # ``_expected_max_sr`` returns E[max of n_trials standard normals]
+            # -- a dimensionless z. Scaling it by the Sharpe standard error
+            # puts it in the same units as SR_hat. Subtracting the raw z from
+            # an annualised Sharpe (the previous behaviour) mixed units and
+            # inflated the deflation by 1/sharpe_standard_error, driving the
+            # statistic to ~-100 even for the best of N zero-skill strategies.
+            e_max_sr = sharpe_standard_error * self._expected_max_sr(n_trials)
+            z_stat = (sr_per_period - e_max_sr) / sharpe_standard_error
 
-        p_value = 1.0 - float(norm.cdf(deflated_sr))
-        haircut = SR - deflated_sr
+            dsr_prob = float(norm.cdf(z_stat))
+
+        p_value = 1.0 -dsr_prob
+        # Haircut in annualised Sharpe units: how much of the observed Sharpe
+        # is attributable to selection bias under the null.
+        haircut = SR - e_max_sr * math.sqrt(annualization_factor)
 
         passes = (
-            deflated_sr > self._config.min_deflated_sharpe and p_value < 0.05
+            dsr_prob > self._config.min_deflated_sharpe and p_value < 0.05
         )
 
         return DeflatedSharpeResult(
             factor_name=factor_name,
             raw_sharpe=SR,
-            deflated_sharpe=deflated_sr,
+            deflated_sharpe=dsr_prob,
             haircut=haircut,
             p_value=p_value,
             n_trials=n_trials,

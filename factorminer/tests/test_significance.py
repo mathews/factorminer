@@ -241,6 +241,9 @@ def test_deflated_sharpe_uses_raw_not_excess_kurtosis(config):
     return so SR clearly exceeds the expected max SR under the null,
     making the bug's practical direction (falsely inflated deflated_sharpe)
     unambiguous regardless of n_trials.
+
+    All Sharpe quantities are per-period: the skew/kurtosis correction and
+    the expected-maximum term are only mutually consistent in those units.
     """
     from scipy.stats import kurtosis, skew
 
@@ -256,25 +259,65 @@ def test_deflated_sharpe_uses_raw_not_excess_kurtosis(config):
 
     mean_r = float(np.mean(ls_returns))
     std_r = float(np.std(ls_returns, ddof=1))
-    sr = (mean_r / std_r) * np.sqrt(252.0)
+    sr = mean_r / std_r  # per-period
     gamma3 = float(skew(ls_returns, bias=False))
     gamma4_raw = float(kurtosis(ls_returns, fisher=False, bias=False))
-    e_max_sr = calc._expected_max_sr(10)
+    gamma4_excess = float(kurtosis(ls_returns, fisher=True, bias=False))
     assert gamma4_raw > 3.5, "fixture must be fat-tailed for this test to be meaningful"
-    assert sr > e_max_sr, "fixture must clear the null bar for the bug's direction to be unambiguous"
+    # The fixture must clear the null bar in per-period units.
+    assert sr > calc._expected_max_sr(10) * np.sqrt(
+        (1.0 - gamma3 * sr + (gamma4_raw - 1.0) / 4.0 * sr**2) / T
+    )
     expected_var_correction = (1.0 - gamma3 * sr + (gamma4_raw - 1.0) / 4.0 * sr**2) / T
-    expected_dsr = (sr - e_max_sr) / np.sqrt(expected_var_correction)
+    expected_dsr = (
+        sr - np.sqrt(expected_var_correction) * calc._expected_max_sr(10)
+    ) / np.sqrt(expected_var_correction)
 
     assert result.deflated_sharpe == pytest.approx(expected_dsr, rel=1e-6)
 
     # Pin the regression explicitly: computing with *excess* kurtosis
     # instead must give a materially different (falsely higher) result.
-    gamma4_excess = float(kurtosis(ls_returns, fisher=True, bias=False))
     buggy_var_correction = (1.0 - gamma3 * sr + (gamma4_excess - 1.0) / 4.0 * sr**2) / T
     assert buggy_var_correction > 0
-    buggy_dsr = (sr - e_max_sr) / np.sqrt(buggy_var_correction)
+    buggy_dsr = (
+        sr - np.sqrt(buggy_var_correction) * calc._expected_max_sr(10)
+    ) / np.sqrt(buggy_var_correction)
     assert result.deflated_sharpe < buggy_dsr
     assert result.deflated_sharpe != pytest.approx(buggy_dsr, rel=1e-3)
+
+
+def test_deflated_sharpe_best_of_n_zero_skill_strategies_is_near_zero(config):
+    """The best of N zero-skill strategies must deflate to ~0.
+
+    This is the defining property of the statistic: E[max SR] is *defined*
+    as the expected maximum Sharpe among ``n_trials`` independent zero-skill
+    strategies, so the strategy that attains that maximum must come out at
+    approximately zero after deflation. Any large negative value means the
+    expected-maximum term and the observed Sharpe are in different units --
+    e.g. a dimensionless ``sqrt(2 ln N)`` subtracted from an annualised
+    Sharpe, which scales the statistic by 1/sqrt(Var(SR)) (~50x here) and
+    reports DSR ~ -100 for pure noise.
+    """
+    rng = np.random.default_rng(0)
+    n_trials, T = 2000, 2429
+    returns = rng.standard_normal((n_trials, T))
+    per_period_sharpe = returns.mean(axis=1) / returns.std(axis=1, ddof=1)
+    best = returns[int(np.argmax(per_period_sharpe))]
+
+    calc = DeflatedSharpeCalculator(config)
+    result = calc.compute("best_of_n", best, n_trials=n_trials)
+
+    # Sampling noise across a single draw keeps this within a small band.
+    assert abs(result.deflated_sharpe) < 5.0, (
+        f"best-of-N zero-skill DSR should be ~0, got {result.deflated_sharpe:.2f}"
+    )
+    # And it must not be a saturating p-value.
+    assert 0.0 < result.p_value < 1.0
+    # raw_sharpe / haircut stay in annualised Sharpe units.
+    assert result.raw_sharpe == pytest.approx(
+        per_period_sharpe.max() * np.sqrt(252.0), rel=1e-9
+    )
+
 
 
 def test_stationary_bootstrap_indices_are_seeded_and_circular():
