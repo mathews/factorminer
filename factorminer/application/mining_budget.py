@@ -39,6 +39,11 @@ class BudgetTracker:
         self.llm_prompt_tokens += prompt_tokens
         self.llm_completion_tokens += completion_tokens
 
+    def record_tokens(self, prompt_tokens: int, completion_tokens: int) -> None:
+        """Add tokens billed by LLM calls that are counted elsewhere."""
+        self.llm_prompt_tokens += prompt_tokens
+        self.llm_completion_tokens += completion_tokens
+
     def record_compute(self, seconds: float) -> None:
         self.compute_seconds += seconds
 
@@ -102,6 +107,8 @@ class EvaluationResult:
     effective_rank_gain: float = 0.0
     log_det_gain: float = 0.0
     score_vector: dict[str, Any] | None = None
+    # MarginalStats.to_dict() under admission.policy "marginal".
+    marginal: dict[str, float] | None = None
     # Parent-formula lineage for EditAwareMemoryPolicy + MRM developmental history.
     parent_formula: str = ""
     parent_ic_paper_mean: float | None = None

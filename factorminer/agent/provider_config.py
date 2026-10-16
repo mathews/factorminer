@@ -20,7 +20,7 @@ from collections import deque
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from factorminer.agent.llm_interface import LLMProvider
+from factorminer.agent.llm_interface import LLMProvider, TokenUsage
 
 PRIMARY = "primary"
 DRAFT = "draft"
@@ -90,11 +90,11 @@ def resolve_credential(role: str, provider: str, config: dict[str, Any]) -> Prov
 
 ERROR_KINDS = (
     "auth", "rate_limit", "timeout", "connection", "bad_request", "server",
-    "missing_dependency", "unknown",
+    "missing_dependency", "truncated", "unknown",
 )
 _RETRYABLE = frozenset({"rate_limit", "timeout", "connection", "server"})
 _NAME_KINDS = (
-    ("importerror", "missing_dependency"), ("modulenotfound", "missing_dependency"),
+    ("truncatedresponse", "truncated"), ("importerror", "missing_dependency"), ("modulenotfound", "missing_dependency"),
     ("authentication", "auth"), ("permissiondenied", "auth"), ("missingapikey", "auth"),
     ("unauthenticated", "auth"), ("ratelimit", "rate_limit"), ("resourceexhausted", "rate_limit"),
     ("timeout", "timeout"), ("deadlineexceeded", "timeout"), ("connection", "connection"),
@@ -186,6 +186,10 @@ class GuardedProvider(LLMProvider):
     @property
     def inner(self) -> LLMProvider:
         return self._inner
+
+    @property
+    def usage(self) -> TokenUsage:
+        return self._inner.usage
 
     @property
     def provider_name(self) -> str:

@@ -382,9 +382,19 @@ class DeflatedSharpeResult:
 class DeflatedSharpeCalculator:
     """Deflated Sharpe Ratio (Bailey & López de Prado, 2014).
 
-    Adjusts the observed Sharpe Ratio for multiple testing by estimating
-    the expected maximum Sharpe under the null hypothesis of zero skill
-    across *n_trials* independent strategies.
+    Tests an observed Sharpe ratio against the expected maximum of
+    ``n_trials`` Sharpe ratios drawn under the null of zero skill. On the
+    per-period scale,
+
+    * ``SR0 = sqrt(V) * ((1 - g) * Z(1 - 1/N) + g * Z(1 - 1/(N e)))`` with ``V``
+      the cross-trial variance of estimated Sharpe ratios (by default the
+      null sampling variance ``1 / (T - 1)``) and ``g`` Euler's constant;
+    * ``z = (SR - SR0) * sqrt(T - 1) / sqrt(1 - g3 SR + (g4 - 1) / 4 SR^2)``
+      with sample skewness ``g3`` and raw kurtosis ``g4``.
+
+    ``deflated_sharpe`` is ``z``; the paper's DSR probability is
+    ``1 - p_value``. ``raw_sharpe`` and ``haircut`` (the hurdle ``SR0``) are
+    annualized by ``annualization_factor`` for reporting only.
 
     Parameters
     ----------
@@ -402,6 +412,7 @@ class DeflatedSharpeCalculator:
         ls_returns: np.ndarray,
         n_trials: float,
         annualization_factor: float = 252.0,
+        trial_sharpe_variance: float | None = None,
     ) -> DeflatedSharpeResult:
         """Compute the Deflated Sharpe Ratio for a factor's L/S returns.
 
@@ -416,31 +427,23 @@ class DeflatedSharpeCalculator:
         ----------
         factor_name : str
         ls_returns : np.ndarray, shape (T,)
-            Long-short portfolio return series (NaN-free expected).
-        n_trials : int
-            Total number of strategy trials (including this one).
+            Per-period returns (or another performance series).
+        n_trials : float
+            Number of (effective) trials searched, including this one.
         annualization_factor : float
-            Trading periods per year (default 252).
-
-        Returns
-        -------
-        DeflatedSharpeResult
+            Periods per year, for the reported Sharpe and hurdle.
+        trial_sharpe_variance : float, optional
+            Cross-trial variance of per-period Sharpe estimates. ``None``
+            uses the null sampling variance ``1 / (T - 1)``.
         """
         valid = ls_returns[~np.isnan(ls_returns)]
         T = len(valid)
-
+        failing = DeflatedSharpeResult(
+            factor_name=factor_name, raw_sharpe=0.0, deflated_sharpe=0.0,
+            haircut=0.0, p_value=1.0, n_trials=n_trials, passes=False,
+        )
         if T < 10 or n_trials < 1:
-            return DeflatedSharpeResult(
-                factor_name=factor_name,
-                raw_sharpe=0.0,
-                deflated_sharpe=0.0,
-                haircut=0.0,
-                p_value=1.0,
-                n_trials=n_trials,
-                passes=False,
-            )
-
-        # Annualised Sharpe
+            return failing
         mean_r = float(np.mean(valid))
         std_r = float(np.std(valid, ddof=1))
         if std_r < 1e-15:
@@ -509,21 +512,19 @@ class DeflatedSharpeCalculator:
             haircut=haircut,
             p_value=p_value,
             n_trials=n_trials,
-            passes=passes,
+            passes=deflated > self._config.min_deflated_sharpe and p_value < 0.05,
         )
 
     @classmethod
-    def _expected_max_sr(cls, n_trials: float) -> float:
-        """E[max(SR)] approximation from Bailey & López de Prado (2014).
-
-        E[max(SR)] ~ sqrt(2*ln(N)) * (1 - gamma / (2*ln(N))) + gamma / sqrt(2*ln(N))
-        """
+    def _expected_max_standard_normal(cls, n_trials: float) -> float:
+        """Expected maximum of ``n_trials`` standard normals (Bailey & LdP, 2014)."""
         if n_trials <= 1:
             return 0.0
-        log_n = math.log(n_trials)
-        sqrt_2log = math.sqrt(2.0 * log_n)
         g = cls._EULER_GAMMA
-        return sqrt_2log * (1.0 - g / (2.0 * log_n)) + g / sqrt_2log
+        return float(
+            (1.0 - g) * norm.ppf(1.0 - 1.0 / n_trials)
+            + g * norm.ppf(1.0 - 1.0 / (n_trials * math.e))
+        )
 
 
 # ---------------------------------------------------------------------------

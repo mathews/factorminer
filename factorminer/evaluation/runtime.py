@@ -247,6 +247,51 @@ class FactorEvaluationArtifact:
             self.split_signals.clear()  # type: ignore[attr-defined]
 
 
+UNIVERSE_MASK_COLUMN = "in_universe"
+
+
+def _resolve_preprocess_config(value: Any) -> Any:
+    """Return the configured ``PreprocessConfig``; defaults when none is declared."""
+    from dataclasses import fields
+
+    from factorminer.data.preprocessor import PreprocessConfig
+
+    if value is None:
+        return PreprocessConfig()
+    if isinstance(value, PreprocessConfig):
+        return value
+    if isinstance(value, Mapping):
+        known = {item.name for item in fields(PreprocessConfig)}
+        unknown = sorted(set(value) - known)
+        if unknown:
+            raise ValueError(f"unknown preprocess settings: {unknown}")
+        return PreprocessConfig(**dict(value))
+    raise TypeError(
+        f"preprocess config must be a PreprocessConfig or mapping, got {type(value).__name__}"
+    )
+
+
+def _universe_mask(raw_df: pd.DataFrame, target_df: pd.DataFrame) -> pd.Series | None:
+    """Align an optional point-in-time membership column to *target_df* rows.
+
+    Rows outside the universe keep their prices, so time-series operators see
+    full histories, but their targets are masked out of every metric.
+    """
+    if UNIVERSE_MASK_COLUMN not in raw_df.columns:
+        return None
+    membership = raw_df[["datetime", "asset_id", UNIVERSE_MASK_COLUMN]].copy()
+    flags = pd.to_numeric(membership[UNIVERSE_MASK_COLUMN], errors="coerce")
+    if flags.isna().any() or not flags.isin([0, 1]).all():
+        raise ValueError(f"{UNIVERSE_MASK_COLUMN} must contain only 0/1 or boolean values")
+    membership[UNIVERSE_MASK_COLUMN] = flags.astype(bool)
+    aligned = target_df[["datetime", "asset_id"]].merge(
+        membership, on=["datetime", "asset_id"], how="left", validate="one_to_one"
+    )
+    return pd.Series(
+        aligned[UNIVERSE_MASK_COLUMN].fillna(False).to_numpy(dtype=bool), index=target_df.index
+    )
+
+
 def load_runtime_dataset(
     raw_df: pd.DataFrame,
     cfg,
@@ -254,7 +299,7 @@ def load_runtime_dataset(
     """Load raw market data into a canonical evaluation dataset."""
     from dataclasses import asdict
 
-    from factorminer.data.preprocessor import PreprocessConfig, preprocess
+    from factorminer.data.preprocessor import preprocess
     from factorminer.data.tensor_builder import TensorConfig, build_tensor
 
     if not pd.api.types.is_datetime64_any_dtype(raw_df["datetime"]):
@@ -262,11 +307,18 @@ def load_runtime_dataset(
         raw_df["datetime"] = pd.to_datetime(raw_df["datetime"])
 
     target_specs = _resolve_target_specs(cfg)
-    target_df = compute_targets(raw_df, target_specs)
+    preprocess_config = _resolve_preprocess_config(getattr(cfg, "preprocess", None))
+    processed_df = preprocess(raw_df, preprocess_config)
+    # Targets count bars on the grid formulas see: timestamps removed by the
+    # quality check must not be skipped over by a forward-return offset.
+    kept = raw_df["datetime"].isin(processed_df["datetime"].unique())
+    target_input = raw_df if kept.all() else raw_df[kept]
+    target_df = compute_targets(target_input, target_specs)
     target_columns = [spec.column_name for spec in target_specs]
     merge_columns = ["datetime", "asset_id", *target_columns]
-    preprocess_config = PreprocessConfig()
-    processed_df = preprocess(raw_df, preprocess_config)
+    universe_mask = _universe_mask(target_input, target_df)
+    if universe_mask is not None:
+        target_df.loc[~universe_mask, target_columns] = np.nan
     processed_df = processed_df.merge(
         target_df[merge_columns],
         on=["datetime", "asset_id"],
@@ -296,6 +348,16 @@ def load_runtime_dataset(
 
     if returns.ndim != 2:
         raise ValueError("Runtime dataset target must be a 2-D (M, T) array")
+
+    preprocessing = {
+        "pipeline": "factorminer.data.preprocessor.preprocess",
+        "config": asdict(preprocess_config),
+        "feature_columns": list(feature_columns),
+        "tensor": {"backend": "numpy", "dtype": "float64"},
+    }
+    if universe_mask is not None:
+        # Recorded only when present, so panels without a mask keep their digest.
+        preprocessing["universe_mask"] = UNIVERSE_MASK_COLUMN
 
     data_dict = {
         _column_to_feature(column): data_tensor[:, :, idx]
@@ -363,12 +425,7 @@ def load_runtime_dataset(
         target_panels=target_panels,
         target_specs={spec.name: spec for spec in target_specs},
         default_target=cfg.data.default_target,
-        preprocessing={
-            "pipeline": "factorminer.data.preprocessor.preprocess",
-            "config": asdict(preprocess_config),
-            "feature_columns": list(feature_columns),
-            "tensor": {"backend": "numpy", "dtype": "float64"},
-        },
+        preprocessing=preprocessing,
     )
 
 
@@ -506,26 +563,73 @@ def _record_split_signals(
             )
 
 
+_PLAN_EXECUTORS: dict[tuple[str, str], Any] = {}
+
+
+def plan_executor(backend: str | None, device: str | None = None) -> Any:
+    """Executor for ``evaluation.backend``; ``None`` runs the NumPy evaluator.
+
+    ``"gpu"`` evaluates plans with :class:`~factorminer.operators.torch_executor.TorchPlanExecutor`
+    on CUDA ``device`` (``evaluation.gpu_device``; default the current CUDA
+    device). One executor is shared per process and device so feature panels
+    upload once.
+    ``"numpy"`` and ``"c"`` (operator-level only) evaluate trees with NumPy.
+    """
+    if backend in (None, "numpy", "c"):
+        return None
+    if backend != "gpu":
+        raise ValueError(f"Unknown evaluation backend {backend!r}")
+    key = (backend, device or "cuda")
+    executor = _PLAN_EXECUTORS.get(key)
+    if executor is None:
+        from factorminer.operators.torch_executor import (
+            TorchPlanExecutor,
+            torch_executor_available,
+        )
+
+        if not torch_executor_available():
+            raise RuntimeError("evaluation.backend 'gpu' requires PyTorch (install the gpu extra)")
+        import torch
+
+        if not torch.cuda.is_available():
+            raise RuntimeError("evaluation.backend 'gpu' requires a CUDA device; none is visible")
+        executor = _PLAN_EXECUTORS.setdefault(key, TorchPlanExecutor(key[1]))
+    return executor
+
+
 def compute_batch_signals(
     trees: Sequence,
     data_dict: Mapping[str, np.ndarray],
     returns_shape: tuple[int, int],
     signal_failure_policy: str = "reject",
+    backend: str | None = None,
+    device: str | None = None,
 ) -> Iterator[tuple[int, np.ndarray | None, Exception | None]]:
     """Evaluate trees through one shared plan, yielding per-formula outcomes.
 
     Each item is ``(index, signals, None)`` or ``(index, None, error)`` where
     ``error`` is what :func:`compute_tree_signals` would have raised for that
     tree alone. Shared subexpressions are evaluated once and released after
-    their last consumer.
+    their last consumer. ``backend`` selects the plan executor
+    (:func:`plan_executor`).
     """
     if not trees:
         return
     batch = compile_batch(trees)
-    for index, value in batch.iter_outputs(data_dict):
+    executor = plan_executor(backend, device)
+    try:
+        yield from _finalized_outputs(batch, trees, data_dict, returns_shape,
+                                      signal_failure_policy, executor)
+    finally:
+        if executor is not None:
+            executor.release()
+
+
+def _finalized_outputs(batch, trees, data_dict, returns_shape, signal_failure_policy, executor):
+    for index, value in batch.iter_outputs(data_dict, executor):
         try:
             signals = _finalize_signals(
-                trees[index].to_string(), value, returns_shape, signal_failure_policy
+                trees[index].to_string(), value, returns_shape, signal_failure_policy, data_dict
             )
         except Exception as exc:  # noqa: BLE001 - reported per formula
             yield index, None, exc
@@ -538,13 +642,24 @@ def compute_tree_signals(
     data_dict: dict[str, np.ndarray],
     returns_shape: tuple[int, int],
     signal_failure_policy: str = "reject",
+    backend: str | None = None,
+    device: str | None = None,
 ) -> np.ndarray:
     """Evaluate an expression tree under an explicit failure policy."""
-    try:
-        value: np.ndarray | Exception = compile_tree(tree).evaluate(data_dict)
-    except Exception as exc:  # noqa: BLE001 - resolved by the failure policy
-        value = exc
-    return _finalize_signals(tree.to_string(), value, returns_shape, signal_failure_policy)
+    executor = plan_executor(backend, device)
+    value: np.ndarray | BaseException
+    if executor is None:
+        try:
+            value = compile_tree(tree).evaluate(data_dict)
+        except Exception as exc:  # noqa: BLE001 - resolved by the failure policy
+            value = exc
+    else:
+        try:
+            (_, value), = compile_batch([tree]).iter_outputs(data_dict, executor)
+        finally:
+            executor.release()
+    return _finalize_signals(tree.to_string(), value, returns_shape, signal_failure_policy,
+                             data_dict)
 
 
 def _finalize_signals(
@@ -552,6 +667,7 @@ def _finalize_signals(
     value: np.ndarray | BaseException | None,
     returns_shape: tuple[int, int],
     signal_failure_policy: str,
+    data: Mapping[str, np.ndarray] | None = None,
 ) -> np.ndarray:
     if isinstance(value, BaseException):
         if not isinstance(value, Exception):
@@ -571,7 +687,19 @@ def _finalize_signals(
             cause=SignalComputationError("Signal computation produced only NaN values"),
         )
 
-    return np.asarray(value, dtype=np.float64)
+    # Immutable signals: callers never write them in place, and the dependence
+    # index fingerprints an array once when no writable buffer lies beneath
+    # it. Results that alias an input panel (``$close``) are copied so the
+    # caller's data stays writable; the evaluator's own buffers are frozen.
+    signals = np.asarray(value, dtype=np.float64)
+    panels = (data or {}).values()
+    if any(isinstance(p, np.ndarray) and np.may_share_memory(signals, p) for p in panels):
+        signals = signals.copy()
+    owner: Any = signals
+    while isinstance(owner, np.ndarray):
+        owner.flags.writeable = False
+        owner = owner.base
+    return signals
 
 
 def compute_correlation_matrix(

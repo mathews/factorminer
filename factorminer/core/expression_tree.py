@@ -219,10 +219,12 @@ class OperatorNode(Node):
 def _safe_div(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     """Division that returns 0 where the denominator is near zero.
 
+    A missing (NaN) denominator gives NaN: a gap in the data is not a zero.
     ``np.where`` evaluates the division on invalid elements before masking it.
     """
     mask = np.abs(b) > _EPS
-    out = np.zeros(np.broadcast_shapes(np.shape(a), np.shape(b)), dtype=np.float64)
+    shape = np.broadcast_shapes(np.shape(a), np.shape(b))
+    out = np.where(np.isnan(np.broadcast_to(b, shape)), np.nan, 0.0)
     np.divide(a, b, out=out, where=mask)
     return out
 
@@ -265,6 +267,55 @@ def _rolling_apply(
         else:
             out[:, t] = func(sx)
     return out
+
+
+# Rows per sorted block keep the (rows, T, window) scratch near 256 MiB.
+_QUANTILE_BLOCK_ELEMENTS = 1 << 25
+
+
+def rolling_nanquantile(x: np.ndarray, window: int, q: float) -> np.ndarray:
+    """Rolling ``np.nanquantile(..., method="linear")`` along the time axis.
+
+    Sorting every window at once replaces one ``nanquantile`` call per
+    (asset, period) and returns bit-identical values: NumPy's virtual index
+    and its two-sided ``_lerp`` rounding are reproduced exactly. Windows with
+    no observations, and the first ``window - 1`` periods, are NaN.
+    """
+    x = np.asarray(x, dtype=np.float64)
+    rows, periods = x.shape
+    out = np.full((rows, periods), np.nan, dtype=np.float64)
+    if window < 1 or periods < window:
+        return out
+    outputs = periods - window + 1
+    # Bound the (rows, outputs, window) scratch in both directions so a single
+    # long series (intraday panels) cannot allocate past the budget either.
+    span = max(1, min(outputs, _QUANTILE_BLOCK_ELEMENTS // window))
+    block = max(1, _QUANTILE_BLOCK_ELEMENTS // (span * window))
+    for start in range(0, rows, block):
+        for first in range(0, outputs, span):
+            last = min(outputs, first + span)
+            out[start:start + block, window - 1 + first:window - 1 + last] = _window_quantile(
+                x[start:start + block, first:last + window - 1], window, q
+            )
+    return out
+
+
+def _window_quantile(x: np.ndarray, window: int, q: float) -> np.ndarray:
+    """Linear-interpolated nanquantile of every full window in a 2-D block."""
+    windows = np.lib.stride_tricks.sliding_window_view(x, window, axis=1)
+    ordered = np.sort(windows, axis=-1)  # NaN sorts last
+    count = window - np.isnan(windows).sum(axis=-1)
+    virtual = (count - 1) * q
+    lower = np.floor(virtual)
+    gamma = virtual - lower
+    lower_idx = np.clip(lower.astype(np.int64), 0, window - 1)
+    upper_idx = np.clip(lower_idx + 1, 0, np.maximum(count - 1, 0))
+    below = np.take_along_axis(ordered, lower_idx[..., None], axis=-1)[..., 0]
+    above = np.take_along_axis(ordered, upper_idx[..., None], axis=-1)[..., 0]
+    diff = above - below
+    value: np.ndarray = np.where(gamma >= 0.5, above - diff * (1 - gamma), below + diff * gamma)
+    value[count == 0] = np.nan
+    return value
 
 
 def _row_nanmean(sx: np.ndarray, *, keepdims: bool = False) -> np.ndarray:
@@ -312,12 +363,21 @@ def _ts_var(sx: np.ndarray) -> np.ndarray:
     return _row_nanvar(sx)
 
 
+def _empty_windows(sx: np.ndarray) -> np.ndarray:
+    empty: np.ndarray = np.all(np.isnan(sx), axis=1)
+    return empty
+
+
 def _ts_sum(sx: np.ndarray) -> np.ndarray:
-    return np.nansum(sx, axis=1)
+    out: np.ndarray = np.nansum(sx, axis=1)
+    out[_empty_windows(sx)] = np.nan
+    return out
 
 
 def _ts_prod(sx: np.ndarray) -> np.ndarray:
-    return np.nanprod(sx, axis=1)
+    out: np.ndarray = np.nanprod(sx, axis=1)
+    out[_empty_windows(sx)] = np.nan
+    return out
 
 
 def _ts_max(sx: np.ndarray) -> np.ndarray:
@@ -377,10 +437,12 @@ def _ts_kurt(sx: np.ndarray) -> np.ndarray:
 
 
 def _ts_rank(sx: np.ndarray) -> np.ndarray:
-    """Percentile rank of the latest value within the window."""
+    """Percentile rank of the latest value within the window (NaN if it is missing)."""
     latest = sx[:, -1]
     rank = np.sum(sx <= latest[:, None], axis=1).astype(np.float64)
-    return rank / sx.shape[1]
+    out = rank / sx.shape[1]
+    out[np.isnan(latest)] = np.nan
+    return out
 
 
 def _ts_corr(sx: np.ndarray, sy: np.ndarray) -> np.ndarray:
@@ -391,7 +453,9 @@ def _ts_corr(sx: np.ndarray, sy: np.ndarray) -> np.ndarray:
     sx_std = np.sqrt(_row_nanvar(sx))
     sy_std = np.sqrt(_row_nanvar(sy))
     denom = sx_std * sy_std
-    return np.divide(cov, denom, out=np.zeros_like(cov), where=denom > _EPS)
+    # Constant windows correlate 0; windows without two observations are NaN.
+    out = np.where(np.isnan(denom), np.nan, 0.0)
+    return np.divide(cov, denom, out=out, where=denom > _EPS)
 
 
 def _ts_cov(sx: np.ndarray, sy: np.ndarray) -> np.ndarray:
@@ -407,7 +471,8 @@ def _ts_beta(sx: np.ndarray, sy: np.ndarray) -> np.ndarray:
     dy = sy - my
     var_y = np.nansum(dy ** 2, axis=1)
     cov_xy = np.nansum((sx - mx) * dy, axis=1)
-    return np.divide(cov_xy, var_y, out=np.zeros_like(cov_xy), where=var_y > _EPS)
+    out = np.where(np.isnan(mx[:, 0]) | np.isnan(my[:, 0]), np.nan, 0.0)
+    return np.divide(cov_xy, var_y, out=out, where=var_y > _EPS)
 
 
 def _ts_resid(sx: np.ndarray, sy: np.ndarray) -> np.ndarray:
@@ -419,13 +484,21 @@ def _ts_resid(sx: np.ndarray, sy: np.ndarray) -> np.ndarray:
 
 
 def _ema(x: np.ndarray, window: int) -> np.ndarray:
-    """Exponential moving average along the last axis."""
+    """Exponential moving average along the last axis.
+
+    The average starts at a series' first observation and skips missing
+    bars, where the output is NaN; a gap does not end the series.
+    """
     alpha = 2.0 / (window + 1)
     M, T = x.shape
-    out = np.empty_like(x, dtype=np.float64)
-    out[:, 0] = x[:, 0]
-    for t in range(1, T):
-        out[:, t] = alpha * x[:, t] + (1 - alpha) * out[:, t - 1]
+    out = np.full_like(x, np.nan, dtype=np.float64)
+    state = np.full(M, np.nan, dtype=np.float64)
+    for t in range(T):
+        value = x[:, t]
+        valid = ~np.isnan(value)
+        update = np.where(np.isnan(state), value, alpha * value + (1 - alpha) * state)
+        state = np.where(valid, update, state)
+        out[valid, t] = state[valid]
     return out
 
 
@@ -569,6 +642,11 @@ def _ts_linreg_rsquare(x: np.ndarray, window: int) -> np.ndarray:
     return out
 
 
+def _mask_missing(values: np.ndarray, source: np.ndarray) -> np.ndarray:
+    values[np.isnan(source)] = np.nan
+    return values
+
+
 # Main dispatch table -------------------------------------------------------
 
 def _dispatch_operator(
@@ -655,9 +733,7 @@ def _dispatch_operator(
         return _rolling_apply(children[0], w, _ts_rank)
     if name == "Quantile":
         q = params.get("q", 0.5)
-        return _rolling_apply(
-            children[0], w, lambda sx: np.nanquantile(sx, q, axis=1)
-        )
+        return rolling_nanquantile(children[0], w, q)
     if name == "CountNaN":
         return _rolling_apply(
             children[0], w, lambda sx: np.sum(np.isnan(sx), axis=1).astype(np.float64)
@@ -691,7 +767,10 @@ def _dispatch_operator(
         M, T = children[0].shape
         out = np.full_like(children[0], np.nan, dtype=np.float64)
         if w < T:
-            ratio = _safe_div(children[0][:, w:], np.where(np.abs(children[0][:, :-w]) > _EPS, children[0][:, :-w], 1.0))
+            prev = children[0][:, :-w]
+            ratio = _safe_div(
+                children[0][:, w:], np.where(np.isnan(prev) | (np.abs(prev) > _EPS), prev, 1.0)
+            )
             out[:, w:] = np.log(np.abs(ratio) + _EPS)
         return out
     if name == "Corr":
@@ -706,14 +785,19 @@ def _dispatch_operator(
         return _wma(children[0], w)
     if name in {"Decay", "TsDecay"}:
         return _decay(children[0], w)
+    # Cumulative operators skip missing bars and are NaN on them.
     if name == "CumSum":
-        return np.nancumsum(children[0], axis=1)
+        return _mask_missing(np.nancumsum(children[0], axis=1), children[0])
     if name == "CumProd":
-        return np.nancumprod(children[0], axis=1)
+        return _mask_missing(np.nancumprod(children[0], axis=1), children[0])
     if name == "CumMax":
-        return np.maximum.accumulate(np.nan_to_num(children[0], nan=-np.inf), axis=1)
+        return _mask_missing(
+            np.maximum.accumulate(np.nan_to_num(children[0], nan=-np.inf), axis=1), children[0]
+        )
     if name == "CumMin":
-        return np.minimum.accumulate(np.nan_to_num(children[0], nan=np.inf), axis=1)
+        return _mask_missing(
+            np.minimum.accumulate(np.nan_to_num(children[0], nan=np.inf), axis=1), children[0]
+        )
 
     # -- Smoothing ----------------------------------------------------------
     if name == "EMA":
@@ -729,10 +813,7 @@ def _dispatch_operator(
     if name == "HMA":
         half_w = max(w // 2, 1)
         sqrt_w = max(int(math.sqrt(w)), 1)
-        wma_half = _wma(children[0], half_w)
-        wma_full = _wma(children[0], w)
-        # Fill leading NaN from the shorter window with the longer
-        diff = 2 * np.nan_to_num(wma_half) - np.nan_to_num(wma_full)
+        diff = 2 * _wma(children[0], half_w) - _wma(children[0], w)
         return _wma(diff, sqrt_w)
 
     # -- Cross-sectional ----------------------------------------------------

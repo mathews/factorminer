@@ -33,6 +33,7 @@ from factorminer.agent.factor_generator import FactorGenerator
 from factorminer.agent.llm_interface import LLMProvider, MockProvider
 from factorminer.agent.output_parser import candidate_pairs
 from factorminer.agent.prompt_builder import PromptBuilder
+from factorminer.application.marginal_admission import build_marginal_basis
 from factorminer.application.mining_budget import BudgetTracker, EvaluationResult
 from factorminer.application.mining_reporting import MiningReporter
 from factorminer.application.research_actions import build_research_action_service
@@ -189,6 +190,7 @@ class RalphLoop:
             protocol=self.protocol,
             geometry=self.geometry,
             research_config=self.settings.research,
+            device=getattr(getattr(config, "evaluation", None), "gpu_device", None),
         )
         self.pipeline = ValidationPipeline(
             data_tensor=data_tensor,
@@ -209,6 +211,9 @@ class RalphLoop:
             default_target=self.dataset_contract.default_target,
         )
         self.pipeline.signal_failure_policy = self.settings.signal_failure_policy
+        self.pipeline.marginal_basis = build_marginal_basis(
+            config, self.evaluation_kernel, self.pipeline._build_data_dict(), returns
+        )
         self.reporter = MiningReporter(self.settings.output_dir)
         self.budget = BudgetTracker()
         self.research_actions = build_research_action_service(self)
@@ -701,9 +706,19 @@ class RalphLoop:
             checkpoint_dir = Path(output_dir) / "checkpoint"
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-        # Save library using library_io (JSON + optional signal cache)
+        # Save library using library_io (JSON + optional signal cache). The
+        # signal cache is rewritten only when the library's members changed,
+        # and uncompressed: compressing it cost seconds per iteration.
         lib_base = str(checkpoint_dir / "library")
-        save_library(self.library, lib_base, save_signals=True)
+        signature = (lib_base, tuple(
+            (factor.id, id(factor.signals)) for factor in self.library.list_factors()
+        ))
+        signals_current = (
+            signature == getattr(self, "_checkpoint_signature", None)
+            and Path(lib_base + "_signals.npz").exists()
+        )
+        save_library(self.library, lib_base, save_signals=not signals_current, compress=False)
+        self._checkpoint_signature = signature
 
         # Policy serialization is the canonical persistence path for all loops.
         mem_path = str(checkpoint_dir / "memory.json")

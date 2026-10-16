@@ -87,9 +87,23 @@ class ResearchActionService:
                     path.unlink()
 
     def library_utility(self) -> float:
+        """Excess quality of the library: the planner's gain signal.
+
+        Under marginal admission each factor counts the partial IC it added
+        when admitted (beyond the reference basis and the library then);
+        otherwise its paper IC beyond the IC threshold.
+        """
+        factors = self.loop.library.list_factors()
+        pipeline = getattr(self.loop, "pipeline", None)
+        if getattr(pipeline, "marginal_basis", None) is not None:
+            floor = pipeline.marginal_config.min_partial_ic
+            return float(sum(
+                max(abs(finite_float((f.research_metrics or {}).get("marginal", {})
+                                     .get("partial_ic"))) - floor, 0)
+                for f in factors
+            ))
         threshold = self.loop.settings.ic_threshold
-        return float(sum(max(finite_float(f.ic_paper_mean) - threshold, 0)
-                         for f in self.loop.library.list_factors()))
+        return float(sum(max(finite_float(f.ic_paper_mean) - threshold, 0) for f in factors))
 
     def prepare(self, payload: Any) -> str:
         records = self.ledger.records()
@@ -251,10 +265,20 @@ class ResearchActionService:
         for formula in (action["parent_formula"], action["formula"]):
             self._contact("delay_challenge", formula, payload.iteration, "dispatched")
             self.evaluations += 1
-            _, signals = kernel.compute_signals(
-                formula=formula, data_dict=data, returns_shape=self.loop.returns.shape,
-                signal_failure_policy="raise",
-            )
+            try:
+                _, signals = kernel.compute_signals(
+                    formula=formula, data_dict=data, returns_shape=self.loop.returns.shape,
+                    signal_failure_policy="raise",
+                )
+            except Exception as exc:  # noqa: BLE001 - recorded as an inconclusive challenge
+                # An evaluation failure (e.g. a full GPU) is not evidence about
+                # retention; record it rather than abort the campaign.
+                payload.stage_metrics["research_challenge"] = {
+                    "parent_formula": action["parent_formula"], "formula": action["formula"],
+                    "status": "inconclusive", "admission_changed": False,
+                    "reason": f"Signal computation failed: {type(exc).__name__}: {exc}"[:500],
+                }
+                return
             panels.append(signals)
         parent, delayed = panels
         mask = np.isfinite(parent) & np.isfinite(delayed) & np.isfinite(self.loop.returns)
@@ -340,16 +364,20 @@ def build_research_action_service(loop: Any) -> ResearchActionService | None:
 
 
 def discovery_dataset(dataset: Any) -> Any:
-    """Provide CLI action research only the configured, horizon-purged train panel."""
+    """Restrict mining to the configured train split, purged of forward-target overlap.
+
+    Every mining entry point uses this so admission never scores a candidate on
+    validation or test periods that are later used for selection or reporting.
+    """
     from factorminer.evaluation.runtime import build_runtime_dataset_from_arrays
 
     indices = dataset.get_split("train").indices
     purge = max((spec.entry_delay_bars + spec.holding_bars
                  for spec in dataset.target_specs.values()), default=1)
     if len(indices) <= purge + 3 or np.any(np.diff(indices) != 1):
-        raise ValueError("Research actions require a contiguous train split with enough periods after target purging")
+        raise ValueError("Mining requires a contiguous train split with enough periods after target purging")
     indices = indices[:-purge]
-    return build_runtime_dataset_from_arrays(
+    discovery = build_runtime_dataset_from_arrays(
         {name: panel[:, indices] for name, panel in dataset.data_dict.items()},
         dataset.returns[:, indices],
         target_panels={name: panel[:, indices] for name, panel in dataset.target_panels.items()},
@@ -357,3 +385,6 @@ def discovery_dataset(dataset: Any) -> Any:
         split_indices={"train": np.arange(len(indices))},
         timestamps=dataset.timestamps[indices], asset_ids=dataset.asset_ids,
     )
+    # Keep preprocessing provenance so raw-price and z-scored campaigns stay distinguishable.
+    discovery.preprocessing = dict(getattr(dataset, "preprocessing", {}) or {})
+    return discovery

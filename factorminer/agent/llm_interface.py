@@ -26,7 +26,9 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import threading
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -36,8 +38,90 @@ class MissingAPIKeyError(ValueError):
     """Raised when a non-mock provider is used without a configured API key."""
 
 
+class TruncatedResponseError(RuntimeError):
+    """The model hit its output-token limit before writing any answer text."""
+
+
+def _answer_or_raise(text: str, *, truncated: bool, provider: str, max_tokens: int) -> str:
+    """Return a response's text, refusing silent empty truncations.
+
+    Reasoning models spend the output limit on hidden reasoning first; when
+    that exhausts it the answer is empty. Returning ``""`` would look like a
+    model that proposed nothing, so it is raised as a typed failure instead.
+    """
+    if truncated:
+        if not text.strip():
+            raise TruncatedResponseError(
+                f"{provider} used all {max_tokens} output tokens before answering; "
+                "raise llm.max_tokens (reasoning models need room for hidden reasoning)"
+            )
+        logger.warning("%s response truncated at %d output tokens", provider, max_tokens)
+    return text
+
+
+@dataclass
+class TokenUsage:
+    """Tokens a provider's API reported for its calls (zero when unreported)."""
+
+    calls: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    cached_prompt_tokens: int = 0
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
+
+    def record(self, prompt: int, completion: int, cached: int = 0) -> None:
+        with self._lock:
+            self.calls += 1
+            self.prompt_tokens += prompt
+            self.completion_tokens += completion
+            self.cached_prompt_tokens += cached
+
+    def totals(self) -> tuple[int, int, int]:
+        return self.prompt_tokens, self.completion_tokens, self.cached_prompt_tokens
+
+
+def _count(source: Any, *names: str) -> int:
+    """First integer count among ``names`` on a usage object, else 0."""
+    for name in names:
+        value = getattr(source, name, None) if source is not None else None
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return int(value)
+    return 0
+
+
+def _record_chat_usage(usage: TokenUsage, response: Any) -> None:
+    """OpenAI-style ``usage``; DeepSeek reports cache hits as ``prompt_cache_hit_tokens``."""
+    reported = getattr(response, "usage", None)
+    if reported is None:
+        return
+    cached = _count(getattr(reported, "prompt_tokens_details", None), "cached_tokens") or _count(
+        reported, "prompt_cache_hit_tokens"
+    )
+    usage.record(
+        _count(reported, "prompt_tokens"), _count(reported, "completion_tokens"), cached
+    )
+
+
+def _chat_completion_text(response: Any, *, provider: str, max_tokens: int) -> str:
+    choice = response.choices[0]
+    return _answer_or_raise(
+        choice.message.content or "",
+        truncated=getattr(choice, "finish_reason", None) == "length",
+        provider=provider, max_tokens=max_tokens,
+    )
+
+
 class LLMProvider(ABC):
     """Abstract base for LLM text-generation providers."""
+
+    @property
+    def usage(self) -> TokenUsage:
+        """Running token counts reported by this provider's API calls."""
+        usage: TokenUsage | None = self.__dict__.get("_token_usage")
+        if usage is None:
+            usage = TokenUsage()
+            self.__dict__["_token_usage"] = usage
+        return usage
 
     @abstractmethod
     def generate(
@@ -201,7 +285,8 @@ class OpenAIProvider(LLMProvider):
             "prompt_cache_key" in kwargs,
         )
         response = client.chat.completions.create(**kwargs)
-        text = response.choices[0].message.content or ""
+        _record_chat_usage(self.usage, response)
+        text = _chat_completion_text(response, provider=self.provider_name, max_tokens=max_tokens)
         logger.debug("OpenAI response: %d chars", len(text))
         return text
 
@@ -323,13 +408,27 @@ class AnthropicProvider(LLMProvider):
         )
 
         response = client.messages.create(**kwargs)
+        reported = getattr(response, "usage", None)
+        if reported is not None:
+            cache_read = _count(reported, "cache_read_input_tokens")
+            self.usage.record(
+                _count(reported, "input_tokens")
+                + cache_read
+                + _count(reported, "cache_creation_input_tokens"),
+                _count(reported, "output_tokens"),
+                cache_read,
+            )
 
         # Extract text from response, skipping thinking blocks
         text_parts = []
         for block in response.content:
             if hasattr(block, "text"):
                 text_parts.append(block.text)
-        text = "\n".join(text_parts) if text_parts else ""
+        text = _answer_or_raise(
+            "\n".join(text_parts) if text_parts else "",
+            truncated=getattr(response, "stop_reason", None) == "max_tokens",
+            provider=self.provider_name, max_tokens=max_tokens,
+        )
         logger.debug("Anthropic response: %d chars", len(text))
         return text
 
@@ -396,7 +495,22 @@ class GoogleProvider(LLMProvider):
                 "max_output_tokens": max_tokens,
             },
         )
-        text = response.text if response.text else ""
+        reported = getattr(response, "usage_metadata", None)
+        if reported is not None:
+            self.usage.record(
+                _count(reported, "prompt_token_count"),
+                _count(reported, "candidates_token_count") + _count(reported, "thoughts_token_count"),
+                _count(reported, "cached_content_token_count"),
+            )
+        candidates = getattr(response, "candidates", None) or []
+        finish = getattr(candidates[0], "finish_reason", None) if candidates else None
+        truncated = getattr(finish, "name", str(finish)).endswith("MAX_TOKENS")
+        parts = getattr(getattr(candidates[0], "content", None), "parts", None) if candidates else None
+        # ``response.text`` raises when a truncated candidate carries no text part.
+        raw = "".join(getattr(part, "text", "") for part in parts) if parts else (
+            "" if truncated else (response.text or ""))
+        text = _answer_or_raise(raw, truncated=truncated, provider=self.provider_name,
+                                max_tokens=max_tokens)
         logger.debug("Google response: %d chars", len(text))
         return text
 
@@ -502,7 +616,8 @@ class OpenAICompatibleProvider(LLMProvider):
             self.timeout_s,
         )
         response = client.chat.completions.create(**kwargs)
-        text = response.choices[0].message.content or ""
+        _record_chat_usage(self.usage, response)
+        text = _chat_completion_text(response, provider=self.provider_name, max_tokens=max_tokens)
         logger.debug("OpenAI-compatible response: %d chars", len(text))
         return text
 
@@ -656,6 +771,16 @@ class CascadeProvider(LLMProvider):
     def provider_name(self) -> str:
         return f"cascade[{self.draft.provider_name}->{self.frontier.provider_name}]"
 
+    @property
+    def usage(self) -> TokenUsage:
+        draft, frontier = self.draft.usage, self.frontier.usage
+        return TokenUsage(
+            calls=draft.calls + frontier.calls,
+            prompt_tokens=draft.prompt_tokens + frontier.prompt_tokens,
+            completion_tokens=draft.completion_tokens + frontier.completion_tokens,
+            cached_prompt_tokens=draft.cached_prompt_tokens + frontier.cached_prompt_tokens,
+        )
+
 
 class MockProvider(LLMProvider):
     """Deterministic provider for testing without API calls.
@@ -779,6 +904,10 @@ class PrefixedCacheProvider(LLMProvider):
     @property
     def inner(self) -> LLMProvider:
         return self._inner
+
+    @property
+    def usage(self) -> TokenUsage:
+        return self._inner.usage
 
     def generate(
         self,

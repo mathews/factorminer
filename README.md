@@ -66,8 +66,8 @@ uv run --env-file .env factorminer \
   -o output/deepseek-research mine --data data/binance_crypto_5m.csv
 ```
 
-The bundled data is a workflow sample. The action lane uses the configured
-training split and purges forward-target overlap. Local mining resumes in the
+The bundled data is a workflow sample. Mining uses only the configured training
+split and purges forward-target overlap. Local mining resumes in the
 same output directory and defaults to no iteration ceiling or model-call/wall-time
 quota. A positive `-n` sets a total campaign iteration boundary for experiments.
 See [research actions](docs/research-actions.md) and
@@ -104,6 +104,7 @@ available mining, analysis, benchmark, and data workflows.
 | [Research skills](docs/research-skills.md) | Compile, transfer, and inspect procedure memory |
 | [Reproducibility](docs/reproducibility.md) | Data, metrics, splits, and benchmarks |
 | [Evidence protocol](docs/evidence-protocol.md) | Inference, risk residualization, and cost diagnostics |
+| [Qlib CN benchmark](docs/qlib-cn-benchmark.md) | A-share panels, Qlib-conformant splits, and Alpha158 comparisons |
 | [Security](docs/security.md) | Input, model, credential, and MCP boundaries |
 | [Agent integration](integrations/factor-researcher/README.md) | Plugin, managed-agent, and MCP setup |
 

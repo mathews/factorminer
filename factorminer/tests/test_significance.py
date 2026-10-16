@@ -229,7 +229,7 @@ def test_deflated_sharpe_short_series(config):
 
 
 def test_deflated_sharpe_uses_raw_not_excess_kurtosis(config):
-    """DSR's variance-correction term must use raw (non-excess) kurtosis.
+    """The dispersion term uses raw kurtosis (normal returns: (g4 - 1) / 4 = 0.5).
 
     Bailey & Lopez de Prado (2014) define gamma4 as raw kurtosis (normal
     distribution => gamma4 = 3), giving ``(gamma4 - 1) / 4 == 0.5`` for
@@ -244,46 +244,49 @@ def test_deflated_sharpe_uses_raw_not_excess_kurtosis(config):
 
     All Sharpe quantities are per-period: the skew/kurtosis correction and
     the expected-maximum term are only mutually consistent in those units.
+    Plugging in scipy's excess kurtosis (normal => 0) would understate the
+    estimator's variance for fat-tailed series and inflate the statistic.
     """
-    from scipy.stats import kurtosis, skew
+    from scipy.stats import kurtosis, norm, skew
 
     rng = np.random.default_rng(11)
     T = 500
     base = rng.normal(loc=0.0035, scale=0.01, size=T)
     jump_mask = rng.random(T) < 0.03
     base[jump_mask] += rng.normal(scale=0.08, size=int(jump_mask.sum()))
-    ls_returns = base
 
-    calc = DeflatedSharpeCalculator(config)
-    result = calc.compute("fat_tailed", ls_returns, n_trials=10)
+    result = DeflatedSharpeCalculator(config).compute("fat_tailed", base, n_trials=10)
 
-    mean_r = float(np.mean(ls_returns))
-    std_r = float(np.std(ls_returns, ddof=1))
-    sr = mean_r / std_r  # per-period
-    gamma3 = float(skew(ls_returns, bias=False))
-    gamma4_raw = float(kurtosis(ls_returns, fisher=False, bias=False))
-    gamma4_excess = float(kurtosis(ls_returns, fisher=True, bias=False))
+    sr = float(np.mean(base) / np.std(base, ddof=1))
+    gamma3 = float(skew(base, bias=False))
+    gamma4_raw = float(kurtosis(base, fisher=False, bias=False))
     assert gamma4_raw > 3.5, "fixture must be fat-tailed for this test to be meaningful"
-    # The fixture must clear the null bar in per-period units.
-    assert sr > calc._expected_max_sr(10) * np.sqrt(
-        (1.0 - gamma3 * sr + (gamma4_raw - 1.0) / 4.0 * sr**2) / T
-    )
-    expected_var_correction = (1.0 - gamma3 * sr + (gamma4_raw - 1.0) / 4.0 * sr**2) / T
-    expected_dsr = (
-        sr - np.sqrt(expected_var_correction) * calc._expected_max_sr(10)
-    ) / np.sqrt(expected_var_correction)
+    g = 0.5772156649015329
+    sr0 = np.sqrt(1.0 / (T - 1)) * ((1 - g) * norm.ppf(1 - 1 / 10) + g * norm.ppf(1 - 1 / (10 * np.e)))
+    expected = (sr - sr0) * np.sqrt(T - 1) / np.sqrt(1 - gamma3 * sr + (gamma4_raw - 1) / 4 * sr**2)
+    assert result.deflated_sharpe == pytest.approx(expected, rel=1e-9)
+    assert result.haircut == pytest.approx(sr0 * np.sqrt(252.0))
 
-    assert result.deflated_sharpe == pytest.approx(expected_dsr, rel=1e-6)
+    gamma4_excess = float(kurtosis(base, fisher=True, bias=False))
+    inflated = (sr - sr0) * np.sqrt(T - 1) / np.sqrt(1 - gamma3 * sr + (gamma4_excess - 1) / 4 * sr**2)
+    assert result.deflated_sharpe < inflated
 
-    # Pin the regression explicitly: computing with *excess* kurtosis
-    # instead must give a materially different (falsely higher) result.
-    buggy_var_correction = (1.0 - gamma3 * sr + (gamma4_excess - 1.0) / 4.0 * sr**2) / T
-    assert buggy_var_correction > 0
-    buggy_dsr = (
-        sr - np.sqrt(buggy_var_correction) * calc._expected_max_sr(10)
-    ) / np.sqrt(buggy_var_correction)
-    assert result.deflated_sharpe < buggy_dsr
-    assert result.deflated_sharpe != pytest.approx(buggy_dsr, rel=1e-3)
+
+def test_deflated_sharpe_matches_bailey_lopez_de_prado_null_scale(config):
+    """Under the null, the expected-maximum hurdle is on the per-period SR scale.
+
+    With 1000 trials of 1000 periods, the null hurdle is about 3.25 / sqrt(999)
+    per period (~1.63 annualized); a per-period SR of 0.2 (3.2 annualized)
+    clears it, which the former annualized-vs-unit-normal comparison denied.
+    """
+    rng = np.random.default_rng(5)
+    series = rng.normal(size=1000)
+    series = (series - series.mean()) / series.std(ddof=1) + 0.2  # per-period SR 0.2
+    result = DeflatedSharpeCalculator(config).compute("strong", series, n_trials=1000)
+    assert result.haircut == pytest.approx(3.2563 / np.sqrt(999) * np.sqrt(252), rel=1e-3)
+    assert result.deflated_sharpe > 3 and result.passes
+    noise = DeflatedSharpeCalculator(config).compute("noise", rng.normal(size=1000), n_trials=1000)
+    assert not noise.passes
 
 
 def test_deflated_sharpe_best_of_n_zero_skill_strategies_is_near_zero(config):

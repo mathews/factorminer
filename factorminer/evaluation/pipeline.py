@@ -186,6 +186,23 @@ def _evaluate_single_candidate_ic(
 # Validation Pipeline
 # ---------------------------------------------------------------------------
 
+def coverage_ranked_subset(returns: np.ndarray, size: int) -> np.ndarray | None:
+    """Best-covered assets for Stage 1 screening, or ``None`` on dense panels.
+
+    When target coverage varies (point-in-time universes mask non-members,
+    listings start late), a random subset would screen on few scored assets
+    per period; the best-covered assets are returned instead, ties broken by
+    a seeded permutation. Dense panels return ``None`` so callers keep their
+    historical random draw.
+    """
+    coverage = np.isfinite(returns).sum(axis=1)
+    if np.all(coverage == coverage[0]):
+        return None
+    tie_break = np.random.default_rng(42).permutation(returns.shape[0])
+    order = np.lexsort((tie_break, -coverage))
+    return np.sort(order[:size])
+
+
 class ValidationPipeline:
     """Multi-stage factor evaluation pipeline.
 
@@ -222,10 +239,13 @@ class ValidationPipeline:
         self.data = data
 
         M, T = returns.shape
-        # Pre-select a random subset of assets for fast screening
+        # Pre-select a subset of assets for fast screening
         if config.fast_screen_assets < M:
-            rng = np.random.default_rng(42)
-            self._fast_idx = rng.choice(M, size=config.fast_screen_assets, replace=False)
+            ranked = coverage_ranked_subset(returns, config.fast_screen_assets)
+            if ranked is None:
+                rng = np.random.default_rng(42)
+                ranked = rng.choice(M, size=config.fast_screen_assets, replace=False)
+            self._fast_idx = ranked
         else:
             self._fast_idx = np.arange(M)
 

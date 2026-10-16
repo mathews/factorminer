@@ -5,15 +5,19 @@ from __future__ import annotations
 import json
 import math
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
 from factorminer.agent.llm_interface import (
+    AnthropicProvider,
     CascadeProvider,
     DeepSeekProvider,
+    GoogleProvider,
     LLMProvider,
     MockProvider,
+    TruncatedResponseError,
     create_provider,
 )
 from factorminer.agent.provider_config import (
@@ -123,6 +127,7 @@ def test_guarded_provider_redacts_credential_from_failures():
         (ModuleNotFoundError("openai"), "missing_dependency"),
         (type("StatusError", (Exception,), {"status_code": 503})(), "server"),
         (ConnectionResetError(), "connection"),
+        (TruncatedResponseError("out of tokens"), "truncated"),
         (ValueError("?"), "unknown"),
     ],
 )
@@ -229,3 +234,122 @@ def test_frozen_evaluation_reports_native_crash_as_unavailable(monkeypatch, tmp_
 
     result = _method_result_from_runtime_payload("alpha101_adapted", summary["alpha101_adapted"], cfg)
     assert math.isnan(result.xgb_ic) and result.unavailable == ["xgboost"]
+
+
+def _completion(content, finish_reason):
+    message = SimpleNamespace(content=content)
+    return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason=finish_reason)])
+
+
+class _FakeClient:
+    def __init__(self, response):
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=lambda **kwargs: response))
+
+
+def test_reasoning_model_out_of_tokens_is_a_typed_failure_not_an_empty_batch(monkeypatch):
+    provider = DeepSeekProvider(api_key="key")
+    monkeypatch.setattr(provider, "_get_client", lambda: _FakeClient(_completion(None, "length")))
+    guarded = GuardedProvider(provider, role=PRIMARY)
+    with pytest.raises(ProviderCallError) as caught:
+        guarded.generate("s", "u", max_tokens=8192)
+    assert caught.value.kind == "truncated" and not caught.value.retryable
+    assert "llm.max_tokens" in str(caught.value)
+
+
+def test_partially_truncated_answer_is_kept(monkeypatch, caplog):
+    provider = DeepSeekProvider(api_key="key")
+    monkeypatch.setattr(provider, "_get_client", lambda: _FakeClient(_completion("a: Neg($close)", "length")))
+    assert provider.generate("s", "u") == "a: Neg($close)"
+    assert "truncated" in caplog.text
+
+
+def test_anthropic_thinking_out_of_tokens_is_a_typed_failure(monkeypatch):
+    provider = AnthropicProvider(api_key="key")
+    thinking_only = SimpleNamespace(content=[SimpleNamespace(type="thinking", thinking="...")],
+                                    stop_reason="max_tokens")
+    client = SimpleNamespace(messages=SimpleNamespace(create=lambda **kwargs: thinking_only))
+    monkeypatch.setattr(provider, "_get_client", lambda: client)
+    with pytest.raises(TruncatedResponseError):
+        provider.generate("s", "u", max_tokens=64)
+
+
+def test_gemini_out_of_tokens_is_a_typed_failure(monkeypatch):
+    provider = GoogleProvider(api_key="key")
+    finish = SimpleNamespace(name="MAX_TOKENS")
+    candidate = SimpleNamespace(finish_reason=finish, content=SimpleNamespace(parts=[]))
+
+    def text():
+        raise ValueError("no text part")
+
+    response = type("R", (), {"candidates": [candidate], "text": property(lambda self: text())})()
+    client = SimpleNamespace(generate_content=lambda *args, **kwargs: response)
+    monkeypatch.setattr(provider, "_get_client", lambda: client)
+    with pytest.raises(TruncatedResponseError):
+        provider.generate("s", "u", max_tokens=64)
+
+
+def test_token_usage_is_recorded_even_when_the_answer_is_truncated(monkeypatch):
+    provider = DeepSeekProvider(api_key="key")
+    response = _completion(None, "length")
+    response.usage = SimpleNamespace(prompt_tokens=1200, completion_tokens=8192,
+                                     prompt_cache_hit_tokens=1024)
+    monkeypatch.setattr(provider, "_get_client", lambda: _FakeClient(response))
+    guarded = GuardedProvider(provider, role=PRIMARY)
+    with pytest.raises(ProviderCallError):
+        guarded.generate("s", "u", max_tokens=8192)
+    assert guarded.usage.totals() == (1200, 8192, 1024)
+    assert guarded.usage is provider.usage
+
+
+def test_anthropic_and_gemini_usage_include_cached_and_thinking_tokens(monkeypatch):
+    anthropic = AnthropicProvider(api_key="key")
+    message = SimpleNamespace(
+        content=[SimpleNamespace(type="text", text="a: Neg($close)")], stop_reason="end_turn",
+        usage=SimpleNamespace(input_tokens=100, output_tokens=40, cache_read_input_tokens=900,
+                              cache_creation_input_tokens=0),
+    )
+    monkeypatch.setattr(anthropic, "_get_client",
+                        lambda: SimpleNamespace(messages=SimpleNamespace(create=lambda **kw: message)))
+    anthropic.generate("s", "u")
+    assert anthropic.usage.totals() == (1000, 40, 900)
+
+    gemini = GoogleProvider(api_key="key")
+    part = SimpleNamespace(text="a: Neg($close)")
+    candidate = SimpleNamespace(finish_reason=SimpleNamespace(name="STOP"),
+                                content=SimpleNamespace(parts=[part]))
+    response = SimpleNamespace(
+        candidates=[candidate],
+        usage_metadata=SimpleNamespace(prompt_token_count=300, candidates_token_count=20,
+                                       thoughts_token_count=80, cached_content_token_count=0),
+    )
+    monkeypatch.setattr(gemini, "_get_client",
+                        lambda: SimpleNamespace(generate_content=lambda *a, **kw: response))
+    gemini.generate("s", "u")
+    assert gemini.usage.totals() == (300, 100, 0)
+
+
+def test_mining_budget_records_provider_tokens_per_iteration(tmp_path):
+    from factorminer.core.ralph_loop import RalphLoop
+    from factorminer.utils.config import load_config
+
+    cfg = load_config()
+    cfg.mining.target_library_size = 3
+    cfg.mining.batch_size = 4
+    provider = MockProvider()
+    calls = {"n": 0}
+    original = provider.generate
+
+    def generate(*args, **kwargs):
+        calls["n"] += 1
+        provider.usage.record(500, 200)
+        return original(*args, **kwargs)
+
+    provider.generate = generate  # type: ignore[method-assign]
+    rng = np.random.default_rng(0)
+    data = rng.normal(size=(12, 60, 8))
+    returns = rng.normal(size=(12, 60))
+    loop = RalphLoop(config=cfg, data_tensor=data, returns=returns, llm_provider=provider)
+    loop._loop_services.execute_iteration(4)
+    assert calls["n"] >= 1
+    assert loop.budget.llm_prompt_tokens == 500 * calls["n"]
+    assert loop.budget.llm_completion_tokens == 200 * calls["n"]

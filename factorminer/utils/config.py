@@ -12,6 +12,7 @@ import yaml
 from factorminer.architecture.research_actions import ResearchPlannerConfig
 from factorminer.architecture.research_skills import ResearchSkillsConfig
 from factorminer.configs import DEFAULT_CONFIG_PATH
+from factorminer.data.preprocessor import PreprocessConfig
 
 
 @dataclass
@@ -96,6 +97,11 @@ class DataConfig:
             "$volume", "$amt", "$vwap", "$returns",
         ]
     )
+    # Prompt descriptions of leaves beyond the OHLCV defaults (``"$pe_ttm":
+    # "trailing P/E"``). Any configured feature that is not a default leaf is
+    # registered on the DSL feature registry when the config loads, so the
+    # parser accepts it and the LLM prompt lists it.
+    feature_descriptions: dict[str, str] = field(default_factory=dict)
     train_period: list[str] = field(
         default_factory=lambda: ["2024-01-01", "2024-12-31"]
     )
@@ -710,6 +716,70 @@ class ResearchConfig:
             raise ValueError("research.skills requires research.planner.enabled")
 
 
+ADMISSION_POLICIES = ("paper", "marginal")
+
+
+@dataclass
+class AdmissionConfig:
+    """Which rule admits a candidate into the library.
+
+    ``paper`` is the paper's rule: an IC/ICIR bar plus a pairwise-correlation
+    cap against the library. ``marginal`` admits a candidate only for value it
+    adds beyond a reference basis (principal components of ``reference``) and
+    the library: a partial rank IC with Newey-West ``t >= min_t``, a residual
+    variance share, and long-only TopkDropout economics of the residual (see
+    ``evaluation.marginal``); with ``recent_periods`` the partial IC must also
+    hold (``t >= min_recent_t``, same sign) over the discovery panel's last
+    periods. ``min_top_t`` / ``min_top_lift_bps`` / ``min_top_lift_t`` add
+    top-of-book gates: the partial IC inside the basis's contention zone (best
+    ``zone_fraction`` of members) and the change in the top-``topk_fraction``
+    spread when the candidate joins the basis's prediction. Candidates of one
+    batch are admitted greedily, each judged against the ones admitted before
+    it.
+    """
+
+    policy: str = "paper"
+    reference: str = "alpha158"
+    reference_components: int = 16
+    ridge: float = 1e-3
+    min_assets: int = 30
+    topk_fraction: float = 1 / 6
+    drop_fraction: float = 0.1
+    cost_bps: float = 20.0
+    min_t: float = 3.0
+    min_partial_ic: float = 0.005
+    min_residual_share: float = 0.2
+    min_excess_bps: float | None = 0.0
+    min_net_bps: float | None = None
+    recent_periods: int = 0
+    min_recent_t: float = 1.0
+    zone_fraction: float = 1 / 3
+    min_top_t: float | None = None
+    min_top_lift_bps: float | None = None
+    min_top_lift_t: float | None = None
+
+    def validate(self) -> None:
+        if self.policy not in ADMISSION_POLICIES:
+            raise ValueError(f"admission.policy must be one of {ADMISSION_POLICIES}")
+        if self.policy == "marginal":
+            from factorminer.core.reference_catalogs import REFERENCE_CATALOGS
+
+            if self.reference not in REFERENCE_CATALOGS:
+                raise ValueError(
+                    f"admission.reference must be one of {sorted(REFERENCE_CATALOGS)}"
+                )
+            from factorminer.evaluation.marginal import MarginalConfig
+
+            MarginalConfig(**self.marginal_settings()).validate()
+
+    def marginal_settings(self) -> dict[str, Any]:
+        """Keyword arguments for ``evaluation.marginal.MarginalConfig``."""
+        settings = asdict(self)
+        settings.pop("policy")
+        settings.pop("reference")
+        return settings
+
+
 @dataclass
 class Config:
     """Top-level configuration aggregating all sub-configs."""
@@ -722,6 +792,8 @@ class Config:
     phase2: Phase2Config = field(default_factory=Phase2Config)
     benchmark: BenchmarkConfig = field(default_factory=BenchmarkConfig)
     research: ResearchConfig = field(default_factory=ResearchConfig)
+    preprocess: PreprocessConfig = field(default_factory=PreprocessConfig)
+    admission: AdmissionConfig = field(default_factory=AdmissionConfig)
 
     def validate(self) -> None:
         """Validate all sub-configurations."""
@@ -733,10 +805,19 @@ class Config:
         self.phase2.validate()
         self.benchmark.validate()
         self.research.validate()
+        self.preprocess.validate()
+        self.admission.validate()
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize config to a plain dictionary."""
-        return asdict(self)
+        payload = asdict(self)
+        # Default preprocessing is omitted so configs that never declared it
+        # keep their historical campaign and config digests.
+        if self.preprocess == PreprocessConfig():
+            del payload["preprocess"]
+        if self.admission == AdmissionConfig():
+            del payload["admission"]
+        return payload
 
     def save(self, path: str | Path) -> None:
         """Write config to a YAML file."""
@@ -755,6 +836,8 @@ _SECTION_MAP: dict[str, type] = {
     "phase2": Phase2Config,
     "benchmark": BenchmarkConfig,
     "research": ResearchConfig,
+    "preprocess": PreprocessConfig,
+    "admission": AdmissionConfig,
 }
 
 _PHASE2_SECTION_MAP: dict[str, type] = {
@@ -878,9 +961,28 @@ def load_config(
             sections[section_name] = _build_phase2(raw)
         elif section_name == "research":
             sections[section_name] = _build_research(raw)
+        elif section_name in ("preprocess", "admission"):
+            # Typos here silently change formula inputs or the admission rule.
+            unknown = sorted(set(raw) - {f.name for f in fields(section_cls)})
+            if unknown:
+                raise ValueError(f"unknown {section_name} settings: {unknown}")
+            sections[section_name] = _build_section(section_cls, raw)
         else:
             sections[section_name] = _build_section(section_cls, raw)
 
     config = Config(**sections)
     config.validate()
+    _register_extra_features(config)
     return config
+
+
+def _register_extra_features(config: Config) -> None:
+    """Register configured non-default leaves (fundamentals, flows, ...) on the DSL."""
+    from factorminer.core.types import get_feature_set, normalize_feature_name, register_features
+
+    known = get_feature_set()
+    extras = [normalize_feature_name(f) for f in config.data.features]
+    extras = [f for f in extras if f not in known]
+    if extras:
+        descriptions = {normalize_feature_name(k): v for k, v in config.data.feature_descriptions.items()}
+        register_features(extras, descriptions=descriptions)

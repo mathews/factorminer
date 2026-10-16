@@ -46,6 +46,7 @@ class EvaluationKernel:
     protocol: PaperProtocol
     geometry: LibraryGeometry
     research_config: Any = None
+    device: str | None = None  # evaluation.gpu_device; not part of the protocol
     reward_hook: RewardHookFn | None = field(default=None, repr=False)
 
 
@@ -77,6 +78,8 @@ class EvaluationKernel:
             data_dict,
             returns_shape,
             signal_failure_policy=signal_failure_policy or self.protocol.signal_failure_policy,
+            backend=self.protocol.evaluation_backend,
+            device=self.device,
         )
         return tree, np.asarray(signals, dtype=np.float64)
 
@@ -115,6 +118,8 @@ class EvaluationKernel:
             data_dict,
             returns_shape,
             signal_failure_policy=signal_failure_policy or self.protocol.signal_failure_policy,
+            backend=self.protocol.evaluation_backend,
+            device=self.device,
         ))
         for formula, tree in zip(formulas, trees, strict=True):
             if tree is None:
